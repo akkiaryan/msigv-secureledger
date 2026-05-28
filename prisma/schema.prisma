@@ -1,0 +1,483 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  ACCOUNTANT
+  AUDITOR
+}
+
+enum LoadPattern {
+  DOMESTIC_ONLY
+  MIXED_COMMERCIAL
+  CUSTOM
+}
+
+enum CylinderCategory {
+  DOMESTIC_14_2
+  COMMERCIAL_19
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CREDIT
+  BANK_TRANSFER
+}
+
+enum ConnectionCategory {
+  SINGLE_BOTTLE
+  DOUBLE_BOTTLE
+}
+
+enum IncidentCategory {
+  LEAKAGE
+  DAMAGE
+  VALVE_DEFECT
+  WEIGHT_ISSUE
+  SEAL_BROKEN
+}
+
+enum SeverityLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AuditAction {
+  INSERT
+  UPDATE_REQUEST
+  ADJUSTMENT
+  DAILY_CLOSING
+  SECURITY_ALERT
+}
+
+// 1. Users
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  passwordHash String
+  name         String
+  role         Role          @default(EMPLOYEE)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  auditLogs    AuditLog[]
+  dailyClosing DailyClosing[]
+
+  @@map("users")
+}
+
+// 2. Employees
+model Employee {
+  id              String             @id @default(cuid())
+  name            String
+  role            String             
+  mobile          String?            @unique
+  dailyWage       Float              @default(0.0)
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deliveries           Delivery[]
+  connections          CustomerConnection[]
+  incidents            CylinderIncident[]
+  regulatorReturns     RegulatorReturn[]
+  hosePipeTransactions HosePipeTransaction[]
+
+  @@map("employees")
+}
+
+// 3. Customers
+model Customer {
+  id                 String               @id @default(cuid())
+  name               String
+  consumerNumber     String?              @unique
+  mobile             String?
+  address            String?
+  customerType       String               
+  creditAllowed      Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  deliveries         Delivery[]
+  connections        CustomerConnection[]
+  commercialLedgers  CommercialLedger[]
+  invoices           Invoice[]
+  emptyReturns       EmptyReturn[]
+  payments           Payment[]
+  regulatorReturns   RegulatorReturn[]
+  hosePipeTransactions HosePipeTransaction[]
+  incidents            CylinderIncident[]
+  contactPerson      String?
+  gstin              String?
+  category           String?              // Hotel / Restaurant / Institution / Shop / Industrial / Other
+  openingOutstanding Float                @default(0.0)
+
+  @@map("customers")
+}
+
+// 4. SBC / DBC Connections
+model CustomerConnection {
+  id                       String             @id @default(cuid())
+  customerId               String
+  customer                 Customer           @relation(fields: [customerId], references: [id])
+  connectionType           ConnectionCategory
+  stoveIncluded            Boolean            @default(false)
+  cylinderSecurityDeposit  Float              @default(0.0)
+  regulatorDeposit         Float              @default(0.0)
+  hosePipeCharge           Float              @default(0.0)
+  stoveCharge              Float              @default(0.0)
+  installationCharge       Float              @default(0.0)
+  totalAmount              Float
+  amountPaid               Float              @default(0.0)
+  amountPending            Float
+  issuedCylindersCount     Int
+  staffId                  String?
+  staff                    Employee?          @relation(fields: [staffId], references: [id])
+  connectionDate           DateTime
+  verificationStatus       String             @default("APPROVED") // PENDING, APPROVED, REJECTED
+  remarks                  String?
+  createdAt                DateTime           @default(now())
+  relationshipId           String?
+  upgradeType              String?            // "NEW", "UPGRADE", "TRANSFER", "OTHER"
+  regulatorIncluded        Boolean            @default(false)
+  hosePipeIncluded         Boolean            @default(false)
+  lpgCardBookRequired      Boolean            @default(false)
+  eKycDone                 Boolean            @default(false)
+  eKycCharges              Float              @default(0.0)
+  lpgCardBookCharges       Float              @default(0.0)
+  paymentMode              String?            // "CASH", "UPI", "BANK_TRANSFER"
+
+  @@map("customer_connections")
+}
+
+// 5. Load Intake
+model Load {
+  id               String      @id @default(cuid())
+  loadNumber       String      @unique
+  arrivalDate      DateTime
+  vehicleNumber    String
+  pattern          LoadPattern
+  totalCylinders   Int
+  unloadingPayment Float       @default(0.0)
+  remarks          String?
+  createdAt        DateTime    @default(now())
+  loadItems        LoadItem[]
+
+  @@map("loads")
+}
+
+model LoadItem {
+  id              String           @id @default(cuid())
+  loadId          String
+  load            Load             @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  cylinderType    CylinderCategory
+  filledReceived  Int              @default(0)
+  emptyReturned   Int              @default(0)
+  damagedDetected Int              @default(0)
+  leakageDetected Int              @default(0)
+
+  @@map("load_items")
+}
+
+// 6. Inventory Balances
+model Inventory {
+  id            String           @id @default(cuid())
+  cylinderType  CylinderCategory @unique
+  filledStock   Int              @default(0)
+  emptyStock    Int              @default(0)
+  damagedStock  Int              @default(0)
+  leakageStock  Int              @default(0)
+  updatedAt     DateTime         @updatedAt
+
+  @@map("inventory")
+}
+
+model InventoryTransaction {
+  id             String           @id @default(cuid())
+  transactionDate DateTime
+  eventType      String           
+  referenceId    String?
+  cylinderType   CylinderCategory
+  filledChange   Int              @default(0)
+  emptyChange    Int              @default(0)
+  damagedChange  Int              @default(0)
+  leakageChange  Int              @default(0)
+  remarks        String?
+  createdAt      DateTime         @default(now())
+
+  @@map("inventory_transactions")
+}
+
+// 7. Deliveries
+model Delivery {
+  id                String             @id @default(cuid())
+  deliveryDate      DateTime
+  customerId        String
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  employeeId        String?
+  employee          Employee?          @relation(fields: [employeeId], references: [id])
+  paymentStatus     String             
+  totalAmount       Float
+  amountReceived    Float              @default(0.0)
+  amountPending     Float
+  verificationStatus String            @default("APPROVED") // PENDING, APPROVED, REJECTED
+  remarks           String?
+  createdAt         DateTime           @default(now())
+  deliveryItems     DeliveryItem[]
+  commercialLedgers CommercialLedger[]
+
+  @@map("deliveries")
+}
+
+model DeliveryItem {
+  id                String           @id @default(cuid())
+  deliveryId        String
+  delivery          Delivery         @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  cylinderType      CylinderCategory
+  quantityDelivered Int
+  emptyReturned     Int              @default(0)
+  dacCode           String?
+  dacVerified       Boolean          @default(false)
+  ratePerCylinder   Float
+  lineTotal         Float
+
+  @@map("delivery_items")
+}
+
+// 8. Commercial credit and empty tracking ledger
+model CommercialLedger {
+  id                String           @id @default(cuid())
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id])
+  deliveryId        String?
+  delivery          Delivery?        @relation(fields: [deliveryId], references: [id])
+  cylinderType      CylinderCategory
+  quantityDelivered Int
+  emptyReturned     Int              @default(0)
+  emptyPending      Int
+  amountBilled      Float
+  amountReceived    Float            @default(0.0)
+  amountPending     Float
+  dueDate           DateTime?
+  status            String           @default("pending") 
+  createdAt         DateTime         @default(now())
+
+  @@map("commercial_ledger")
+}
+
+// 9. Daily Closing
+model DailyClosing {
+  id                String      @id @default(cuid())
+  closingDate       DateTime    @unique
+  supervisorId      String?
+  supervisor        User?       @relation(fields: [supervisorId], references: [id])
+  physical14Filled  Int
+  physical14Empty   Int
+  physical19Filled  Int
+  physical19Empty   Int
+  physicalDamaged   Int         @default(0)
+  physicalLeakage   Int         @default(0)
+  expected14Filled  Int
+  expected14Empty   Int
+  expected19Filled  Int
+  expected19Empty   Int
+  mismatch14Filled  Int
+  mismatch14Empty   Int
+  mismatch19Filled  Int
+  mismatch19Empty   Int
+  cashInHand        Float
+  isLocked             Boolean               @default(false)
+  remarks              String?
+  createdAt            DateTime              @default(now())
+  auditorVerifications AuditorVerification[]
+
+  @@map("daily_closing")
+}
+
+// 10. Cylinder defects / leakages
+model CylinderIncident {
+  id                     String            @id @default(cuid())
+  incidentDate           DateTime
+  cylinderType           CylinderCategory?
+  quantity               Int
+  incidentType           IncidentCategory?
+  severity               SeverityLevel
+  location               String
+  detectedById           String?
+  detectedBy             Employee?         @relation(fields: [detectedById], references: [id])
+  status                 String            @default("open") 
+  actionTaken            String?
+  emailSent              Boolean           @default(false)
+  verificationStatus     String            @default("APPROVED") // PENDING, APPROVED, REJECTED
+  remarks                String?
+  createdAt              DateTime          @default(now())
+  incidentCategory       String?           // Cylinder / Regulator / Hose Pipe / Delivery / Customer Complaint / Other
+  issueType              String?           // Leakage / Damage / Valve Issue / Regulator Defect / Hose Pipe Return / Seal Issue / Other
+  regulatorSerialNumber  String?
+  reportedBy             String?
+  hosePipeReturned       Boolean           @default(false)
+  hosePipeQuantity       Int               @default(0)
+  customerId             String?
+  customer               Customer?         @relation(fields: [customerId], references: [id])
+  photoUrl               String?
+
+  @@map("cylinder_incidents")
+}
+
+// 11. Expenses
+model Expense {
+  id          String      @id @default(cuid())
+  expenseDate DateTime
+  category    String      
+  amount      Float
+  paidTo      String
+  paymentMode PaymentMode
+  referenceId String?
+  remarks     String?
+  createdAt   DateTime    @default(now())
+
+  @@map("expenses")
+}
+
+// 12. Audit Trail Logs
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  tableName  String
+  recordId   String
+  oldState   Json?
+  newState   Json?
+  remarks    String?
+  createdAt  DateTime    @default(now())
+
+  @@map("audit_logs")
+}
+
+// 13. Employee Onboarding Invites
+model Invite {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String
+  role      Role     @default(EMPLOYEE)
+  token     String   @unique
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("invites")
+}
+
+// 14. Invoices
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  invoiceDate   DateTime @default(now())
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  cylinderType  String
+  quantity      Int
+  rate          Float
+  totalAmount   Float
+  paidAmount    Float    @default(0.0)
+  balanceAmount Float
+  paymentStatus String   // "paid", "pending"
+  createdAt     DateTime @default(now())
+
+  @@map("invoices")
+}
+
+// 15. Empty Cylinder Returns
+model EmptyReturn {
+  id                 String   @id @default(cuid())
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id])
+  quantity           Int
+  cylinderType       String   // "DOMESTIC_14_2" or "COMMERCIAL_19"
+  returnDate         DateTime @default(now())
+  verificationStatus String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  remarks            String?
+  createdAt          DateTime @default(now())
+
+  @@map("empty_returns")
+}
+
+// 16. Payments Received
+model Payment {
+  id                 String   @id @default(cuid())
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id])
+  amount             Float
+  paymentDate        DateTime @default(now())
+  paymentMode        String   // "CASH", "UPI", "BANK_TRANSFER"
+  verificationStatus String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  remarks            String?
+  createdAt          DateTime @default(now())
+
+  @@map("payments")
+}
+
+model RegulatorReturn {
+  id           String    @id @default(cuid())
+  serialNumber String
+  returnDate   DateTime  @default(now())
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  staffId      String?
+  staff        Employee? @relation(fields: [staffId], references: [id])
+  remarks      String?
+  createdAt    DateTime  @default(now())
+
+  @@map("regulator_returns")
+}
+
+model HosePipeTransaction {
+  id         String    @id @default(cuid())
+  type       String    // "SALE" or "RETURN"
+  quantity   Int
+  txDate     DateTime  @default(now())
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  staffId    String?
+  staff      Employee? @relation(fields: [staffId], references: [id])
+  remarks    String?
+  createdAt  DateTime  @default(now())
+
+  @@map("hose_pipe_transactions")
+}
+
+model KycCardBookTransaction {
+  id               String    @id @default(cuid())
+  type             String    // "EKYC" or "CARDBOOK"
+  count            Int
+  chargesCollected Float
+  txDate           DateTime  @default(now())
+  remarks          String?
+  createdAt        DateTime  @default(now())
+
+  @@map("kyc_card_book_transactions")
+}
+
+model AuditorVerification {
+  id              String        @id @default(cuid())
+  verificationDate DateTime      @default(now())
+  imageUrl        String?
+  notes           String?
+  uploadedBy      String
+  closingId       String?
+  closing         DailyClosing? @relation(fields: [closingId], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@map("auditor_verifications")
+}
+
