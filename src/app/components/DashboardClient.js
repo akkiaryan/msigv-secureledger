@@ -1179,41 +1179,46 @@ export default function DashboardClient({ initialData, user }) {
       )}
 
       {/* Global 80px Top Header */}
-      <header className="h-[80px] fixed top-0 left-0 right-0 bg-white border-b border-[#D7DEE8] px-6 flex items-center justify-between z-[100] print:hidden">
-        {/* Left Side: Logo & Title */}
-        <div className="flex items-center gap-3">
-          <img src="/logo.svg" className="w-10 h-10 object-contain" alt="IOCL Logo" />
+      <header className="h-[80px] fixed top-0 left-0 right-0 bg-white border-b border-[#D7DEE8] flex items-center z-[100] print:hidden">
+        {/* Left Brand Area (spans the sidebar width of 260px) */}
+        <div className="w-[260px] h-full flex items-center gap-3 px-6 border-r border-[#D7DEE8] shrink-0">
+          <img src="/logo.svg" className="w-9 h-9 object-contain" alt="IOCL Logo" />
           <div>
-            <h1 className="text-base font-bold text-[#001F5B] leading-none uppercase tracking-wide">
-              Maa Santoshi Indane Gramin Vitrak
-            </h1>
-            <p className="text-[10px] text-gray-500 font-semibold tracking-wider mt-0.5 uppercase">
-              LPG SecureLedger Portal
-            </p>
+            <h2 className="font-bold text-[#001F5B] text-xs leading-tight">Maa Santoshi Indane</h2>
+            <p className="text-[9px] text-[#F37022] font-bold uppercase tracking-wider">Gramin Vitrak</p>
           </div>
         </div>
 
-        {/* Center: User Info & Status */}
-        <div className="hidden md:flex flex-col items-center text-center">
-          <div className="flex items-center gap-2 bg-[#001F5B]/5 px-3 py-1 rounded border border-[#001F5B]/10">
-            <User className="w-3.5 h-3.5 text-[#001F5B]" />
+        {/* Right Main Header Area (spans the content area, aligned with app-content) */}
+        <div className="flex-1 h-full max-w-[1280px] mr-auto px-8 flex items-center justify-between">
+          <div>
             <span className="text-xs font-bold text-[#001F5B] uppercase tracking-wider">
-              {user.name} ({user.role})
+              LPG SecureLedger Portal
             </span>
           </div>
-          <span className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-ping"></span>
-            System Online & Secure
-          </span>
-        </div>
 
-        {/* Right Side: SAP Code & Date */}
-        <div className="flex items-center gap-4 text-right">
-          <div className="flex flex-col text-xs text-gray-700 font-semibold">
-            <div>SAP CODE: <span className="text-[#001F5B] font-bold font-mono">283056</span></div>
-            <div className="flex items-center gap-1.5 justify-end mt-0.5">
-              <Calendar className="w-3.5 h-3.5 text-[#F37022]" />
-              <span>DATE: <span className="text-[#001F5B] font-bold font-mono">{new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}</span></span>
+          {/* Center: User Info & Status */}
+          <div className="hidden md:flex flex-col items-center text-center">
+            <div className="flex items-center gap-2 bg-[#001F5B]/5 px-3 py-1 rounded border border-[#001F5B]/10">
+              <User className="w-3.5 h-3.5 text-[#001F5B]" />
+              <span className="text-xs font-bold text-[#001F5B] uppercase tracking-wider">
+                {user.name} ({user.role})
+              </span>
+            </div>
+            <span className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-ping"></span>
+              System Online & Secure
+            </span>
+          </div>
+
+          {/* Right Side: SAP Code & Date */}
+          <div className="flex items-center gap-4 text-right">
+            <div className="flex flex-col text-xs text-gray-700 font-semibold">
+              <div>SAP CODE: <span className="text-[#001F5B] font-bold font-mono">283056</span></div>
+              <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                <Calendar className="w-3.5 h-3.5 text-[#F37022]" />
+                <span>DATE: <span className="text-[#001F5B] font-bold font-mono">{new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}</span></span>
+              </div>
             </div>
           </div>
         </div>
@@ -1221,14 +1226,6 @@ export default function DashboardClient({ initialData, user }) {
 
       {/* LEFT SIDEBAR NAVIGATION */}
       <aside className="app-sidebar print:hidden" style={{ top: '80px', height: 'calc(100vh - 80px)' }}>
-        <div className="brand-section">
-          <img src="/logo.svg" alt="IOCL Logo" style={{ width: '36px', height: '40px', objectFit: 'contain' }} />
-          <div className="brand-title">
-            <h2 className="font-bold text-[#001F5B] text-xs leading-tight">Maa Santoshi Indane</h2>
-            <p className="text-[9px] text-[#F37022] font-bold uppercase tracking-wider">Gramin Vitrak</p>
-          </div>
-        </div>
-
         <nav className="sidebar-nav flex-1 space-y-1 overflow-y-auto">
           {/* Main Dashboard item */}
           <div 
