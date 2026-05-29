@@ -1229,7 +1229,7 @@ export default function DashboardClient({ initialData, user }) {
         <nav className="sidebar-nav flex-1 space-y-1 overflow-y-auto">
           {/* Main Dashboard item */}
           <div 
-            className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'dashboard' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+            className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'dashboard' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
             onClick={() => { setActiveTab('dashboard'); setActiveForm(null); }}
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -1239,69 +1239,69 @@ export default function DashboardClient({ initialData, user }) {
           {/* ADMIN SIDEBAR LINKS */}
           {isAdmin && (
             <>
-              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
+              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
               >
                 <RefreshCw className="w-4 h-4" />
                 <span className="nav-text">Cylinder Refill Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
               >
                 <UserPlus className="w-4 h-4" />
                 <span className="nav-text">New Connection (SBC/DBC)</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
               >
                 <AlertOctagon className="w-4 h-4" />
                 <span className="nav-text">Incident / Complaint Entry</span>
               </div>
 
-              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">MANAGEMENT</div>
+              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">MANAGEMENT</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
               >
                 <Receipt className="w-4 h-4" />
                 <span className="nav-text">Commercial Credit</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
               >
                 <Lock className="w-4 h-4" />
                 <span className="nav-text">Daily Closing</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
                 <span className="nav-text">Reports & Downloads</span>
               </div>
 
-              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">ADMINISTRATION</div>
+              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">ADMINISTRATION</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'staff' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'staff' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('staff'); setActiveForm(null); }}
               >
                 <Users className="w-4 h-4" />
                 <span className="nav-text">Staff Management</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'archive' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'archive' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('archive'); setActiveForm(null); }}
               >
                 <Database className="w-4 h-4" />
                 <span className="nav-text">Data Archive</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'settings' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'settings' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('settings'); setActiveForm(null); }}
               >
                 <Lock className="w-4 h-4" />
@@ -1313,30 +1313,30 @@ export default function DashboardClient({ initialData, user }) {
           {/* EMPLOYEE SIDEBAR LINKS */}
           {isEmployee && (
             <>
-              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
+              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
               >
                 <RefreshCw className="w-4 h-4" />
                 <span className="nav-text">Cylinder Refill Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
               >
                 <UserPlus className="w-4 h-4" />
                 <span className="nav-text">New Connection (SBC/DBC)</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
               >
                 <AlertOctagon className="w-4 h-4" />
                 <span className="nav-text">Incident / Complaint Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'my_entries' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'my_entries' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('my_entries'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
@@ -1348,30 +1348,30 @@ export default function DashboardClient({ initialData, user }) {
           {/* AUDITOR SIDEBAR LINKS */}
           {isAuditor && (
             <>
-              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">AUDIT</div>
+              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">AUDIT</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
               >
                 <ClipboardCheck className="w-4 h-4" />
                 <span className="nav-text">Daily Closing Verification</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
               >
                 <Receipt className="w-4 h-4" />
                 <span className="nav-text">Account Ledger</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
                 <span className="nav-text">Reports & Downloads</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'auditor_uploads' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'auditor_uploads' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('auditor_uploads'); setActiveForm(null); }}
               >
                 <Database className="w-4 h-4" />
@@ -1405,166 +1405,220 @@ export default function DashboardClient({ initialData, user }) {
       </aside>
 
       {/* MAIN CONTAINER */}
-      <main className="app-content mt-[80px] pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
+      <main className="app-content mt-[195px] sm:mt-[140px] lg:mt-[80px] pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
         {!dbData.isInitialized ? (
           activeTab === 'dashboard' ? (
             /* SYSTEM NOT INITIALIZED GATE */
-            <div className="max-w-4xl mx-auto my-8">
-            {isAdmin || user.role === 'AUDITOR' ? (
-              /* Setup Form Panel for Admin / Auditor */
-              <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-md">
-                <div className="border-b border-[#D7DEE8] pb-4 mb-6">
-                  <h2 className="text-xl font-bold text-[#001F5B] uppercase tracking-wide">
-                    Initialize LPG Opening Stock Setup
-                  </h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    The ledger database requires the starting stock balances to begin logging transactions.
+            <div className="max-w-[1200px] mx-auto px-6 py-6 flex flex-col gap-6 w-full">
+              {isAdmin || user.role === 'AUDITOR' ? (
+                <>
+                  {/* Information Banner (Issue #7) */}
+                  <div className="bg-[#EFF6FF] border border-[#BFD7FF] p-5 rounded-xl flex gap-3 text-[#001F5B] shadow-sm">
+                    <Info className="w-5 h-5 text-[#F37022] shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <h4 className="font-bold uppercase tracking-wide mb-1">Opening Stock Initialization</h4>
+                      <p className="leading-relaxed">
+                        This setup defines the opening inventory, regulators, suraksha hose pipes, and treasury balance for Maa Santoshi Indane Gramin Vitrak.
+                      </p>
+                      <p className="font-semibold mt-1.5 text-[#F37022]">
+                        * This action should only be performed by authorized Admin or Auditor.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Administration Setup Card (Issue #5) */}
+                  <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-sm">
+                    <div className="border-b border-[#D7DEE8] pb-4 mb-6">
+                      <h2 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
+                        Administration Setup
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Configure Opening Inventory & Treasury
+                      </p>
+                    </div>
+
+                    {feedback && feedback.type === 'error' && (
+                      <div className="bg-red-50 text-red-700 p-3 rounded text-xs font-semibold mb-4">
+                        {feedback.message}
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleFormSubmit('opening_stock');
+                      }}
+                      className="space-y-6"
+                    >
+                      {/* Section A: Cylinder Inventory (Issue #8) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5">
+                          <Package className="w-3.5 h-3.5 text-[#F37022]" />
+                          Section A: Cylinder Inventory
+                        </h3>
+                        {/* Responsive 2-Column Grid (Issue #3 & Issue #9) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Setup Date*</label>
+                            <input
+                              type="date"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800 w-full"
+                              value={openingStockForm.date}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, date: e.target.value }))}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Domestic 14.2kg Filled Stock*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.filled14}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, filled14: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Domestic 14.2kg Empty Stock*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.empty14}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, empty14: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Commercial 19kg Filled Stock*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.filled19}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, filled19: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 text-xs font-semibold lg:col-span-2">
+                            <label className="text-gray-700">Commercial 19kg Empty Stock*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.empty19}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, empty19: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section B: Accessories (Issue #8) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
+                          <Users className="w-3.5 h-3.5 text-[#F37022]" />
+                          Section B: Accessories
+                        </h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Regulators Qty*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.regulators}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, regulators: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 text-xs font-semibold">
+                            <label className="text-gray-700">Suraksha Hose Pipes Qty*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.hosePipes}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, hosePipes: parseInt(e.target.value) || 0 }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section C: Treasury (Issue #8) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
+                          <DollarSign className="w-3.5 h-3.5 text-[#F37022]" />
+                          Section C: Treasury
+                        </h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1 text-xs font-semibold lg:col-span-2">
+                            <label className="text-gray-700">Opening Treasury Cash (INR)*</label>
+                            <input
+                              type="number"
+                              min="0"
+                              required
+                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                              value={openingStockForm.openingCash}
+                              onChange={e => setOpeningStockForm(prev => ({ ...prev, openingCash: parseFloat(e.target.value) || 0 }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section D: Reference (Issue #8) */}
+                      <div>
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
+                          <FileText className="w-3.5 h-3.5 text-[#F37022]" />
+                          Section D: Reference
+                        </h3>
+                        <div className="flex flex-col gap-1 text-xs font-semibold">
+                          <label className="text-gray-700">Remarks / Reference</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Starting opening balances setup"
+                            className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
+                            value={openingStockForm.remarks}
+                            onChange={e => setOpeningStockForm(prev => ({ ...prev, remarks: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Action Footer (Issue #4 & Issue #9) */}
+                      <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3 px-1">
+                        <button
+                          type="button"
+                          onClick={() => signOut({ callbackUrl: '/sign-in' })}
+                          className="w-full sm:w-auto px-6 h-[48px] bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 flex items-center justify-center"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full sm:w-auto px-6 h-[48px] bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 disabled:opacity-50 flex items-center justify-center"
+                        >
+                          {isSubmitting ? 'Initializing Stock...' : 'Save & Initialize Portal'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </>
+              ) : (
+                /* Plain message Screen for Employee */
+                <div className="bg-white border border-[#D7DEE8] rounded-xl p-8 shadow-sm text-center max-w-md mx-auto my-12">
+                  <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
+                  <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
+                    System Not Initialized
+                  </h3>
+                  <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                    System is not initialized. Please ask the Administrator to set the opening stock first.
                   </p>
                 </div>
-                {feedback && feedback.type === 'error' && (
-                  <div className="bg-red-50 text-red-700 p-3 rounded text-xs font-semibold mb-4">
-                    {feedback.message}
-                  </div>
-                )}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleFormSubmit('opening_stock');
-                  }}
-                  className="space-y-6"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {/* Date */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Setup Date*</label>
-                      <input
-                        type="date"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
-                        value={openingStockForm.date}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, date: e.target.value }))}
-                      />
-                    </div>
-                    {/* Domestic Filled */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Domestic 14.2kg Filled Stock*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.filled14}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, filled14: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Domestic Empty */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Domestic 14.2kg Empty Stock*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.empty14}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, empty14: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Commercial Filled */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Commercial 19kg Filled Stock*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.filled19}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, filled19: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Commercial Empty */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Commercial 19kg Empty Stock*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.empty19}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, empty19: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Regulators */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Regulators Qty*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.regulators}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, regulators: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Hose Pipes */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Suraksha Hose Pipes Qty*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.hosePipes}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, hosePipes: parseInt(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Opening Cash */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold">
-                      <label className="text-gray-700">Opening Treasury Cash (INR)*</label>
-                      <input
-                        type="number"
-                        min="0"
-                        required
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                        value={openingStockForm.openingCash}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, openingCash: parseFloat(e.target.value) || 0 }))}
-                      />
-                    </div>
-                    {/* Remarks */}
-                    <div className="flex flex-col gap-1 text-xs font-semibold sm:col-span-2 md:col-span-3">
-                      <label className="text-gray-700">Remarks / Reference</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Starting opening balances setup"
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-normal"
-                        value={openingStockForm.remarks}
-                        onChange={e => setOpeningStockForm(prev => ({ ...prev, remarks: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-gray-100 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="px-6 py-3 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 disabled:opacity-50"
-                    >
-                      {isSubmitting ? 'Initializing Stock...' : 'Save & Initialize Portal'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              /* Plain message Screen for Employee */
-              <div className="bg-white border border-[#D7DEE8] rounded-xl p-8 shadow-md text-center max-w-md mx-auto my-12">
-                <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
-                <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
-                  System Not Initialized
-                </h3>
-                <p className="text-xs text-gray-600 mt-2 leading-relaxed">
-                  System is not initialized. Please ask the Administrator to set the opening stock first.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           ) : (
             /* Warning Screen for other tabs when not initialized */
             <div className="max-w-xl mx-auto my-12 text-center p-8 bg-white border border-[#D7DEE8] rounded-xl shadow-sm">
