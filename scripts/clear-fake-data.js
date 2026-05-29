@@ -31,6 +31,8 @@ async function main() {
   await prisma.customerConnection.deleteMany({});
   await prisma.monthlyArchive.deleteMany({});
   await prisma.loadCycle.deleteMany({});
+  await prisma.inventoryTransaction.deleteMany({});
+  await prisma.dailyClosing.deleteMany({});
 
   // Delete customers (all commercial and domestic)
   await prisma.customer.deleteMany({});

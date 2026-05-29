@@ -58,6 +58,12 @@ export async function getDashboardData() {
     const domesticInv = inventory.find(i => i.cylinderType === 'DOMESTIC_14_2') || { filledStock: 0, emptyStock: 0, damagedStock: 0, leakageStock: 0 };
     const commercialInv = inventory.find(i => i.cylinderType === 'COMMERCIAL_19') || { filledStock: 0, emptyStock: 0, damagedStock: 0, leakageStock: 0 };
 
+    // Check if opening stock has been initialized
+    const openingStockTx = await prisma.inventoryTransaction.findFirst({
+      where: { eventType: 'OPENING_STOCK' }
+    });
+    const isInitialized = !!openingStockTx;
+
     const employees = await prisma.employee.findMany({ where: { isActive: true } });
     const customers = await prisma.customer.findMany();
     
@@ -211,6 +217,7 @@ export async function getDashboardData() {
     return {
       success: true,
       data: {
+        isInitialized,
         inventory: {
           domestic: domesticInv,
           commercial: commercialInv
@@ -253,6 +260,105 @@ export async function getDashboardData() {
     };
   } catch (error) {
     console.error('getDashboardData error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ----------------------------------------------------
+// 1.5 Initialize Opening Stock (ADMIN / AUDITOR only)
+// ----------------------------------------------------
+export async function initializeOpeningStock(data) {
+  try {
+    const user = await checkAuth(['ADMIN', 'AUDITOR']);
+    const schema = z.object({
+      date: z.string().min(1, "Date is required"),
+      filled14: z.number().int().nonnegative(),
+      empty14: z.number().int().nonnegative(),
+      filled19: z.number().int().nonnegative(),
+      empty19: z.number().int().nonnegative(),
+      regulators: z.number().int().nonnegative().optional(),
+      hosePipes: z.number().int().nonnegative().optional(),
+      openingCash: z.number().nonnegative().optional(),
+      remarks: z.string().optional()
+    });
+
+    const parsed = schema.parse(data);
+
+    await prisma.$transaction(async (tx) => {
+      // Upsert Domestic 14.2 kg
+      await tx.inventory.upsert({
+        where: { cylinderType: 'DOMESTIC_14_2' },
+        update: {
+          filledStock: parsed.filled14,
+          emptyStock: parsed.empty14,
+          damagedStock: 0,
+          leakageStock: 0
+        },
+        create: {
+          cylinderType: 'DOMESTIC_14_2',
+          filledStock: parsed.filled14,
+          emptyStock: parsed.empty14,
+          damagedStock: 0,
+          leakageStock: 0
+        }
+      });
+
+      // Upsert Commercial 19 kg
+      await tx.inventory.upsert({
+        where: { cylinderType: 'COMMERCIAL_19' },
+        update: {
+          filledStock: parsed.filled19,
+          emptyStock: parsed.empty19,
+          damagedStock: 0,
+          leakageStock: 0
+        },
+        create: {
+          cylinderType: 'COMMERCIAL_19',
+          filledStock: parsed.filled19,
+          emptyStock: parsed.empty19,
+          damagedStock: 0,
+          leakageStock: 0
+        }
+      });
+
+      // Create transaction logs
+      await tx.inventoryTransaction.create({
+        data: {
+          transactionDate: new Date(parsed.date),
+          eventType: 'OPENING_STOCK',
+          cylinderType: 'DOMESTIC_14_2',
+          filledChange: parsed.filled14,
+          emptyChange: parsed.empty14,
+          remarks: `Opening Stock Initialized (14.2 kg): ${parsed.remarks || ''}`
+        }
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          transactionDate: new Date(parsed.date),
+          eventType: 'OPENING_STOCK',
+          cylinderType: 'COMMERCIAL_19',
+          filledChange: parsed.filled19,
+          emptyChange: parsed.empty19,
+          remarks: `Opening Stock Initialized (19 kg): ${parsed.remarks || ''}`
+        }
+      });
+    });
+
+    await writeAudit(
+      user.id,
+      'ADJUSTMENT',
+      'inventory',
+      'N/A',
+      null,
+      parsed,
+      `Opening Stock Initialized: 14.2kg Filled=${parsed.filled14}, Empty=${parsed.empty14}; 19kg Filled=${parsed.filled19}, Empty=${parsed.empty19}`
+    );
+
+    revalidatePath('/');
+    return { success: true, message: 'Opening Stock successfully initialized!' };
+  } catch (error) {
+    console.error('initializeOpeningStock error:', error.message);
     return { success: false, error: error.message };
   }
 }
@@ -487,61 +593,67 @@ export async function submitDelivery(data) {
         }
       });
 
-      if (verificationStatus === 'APPROVED') {
-        await tx.inventory.update({
-          where: { cylinderType: parsed.cylinderType },
-          data: {
-            filledStock: { decrement: parsed.quantityDelivered },
-            emptyStock: { increment: parsed.emptyReturned }
-          }
-        });
+      // Real-time Stock Reduction Logic
+      const currentStock = await tx.inventory.findUnique({
+        where: { cylinderType: parsed.cylinderType }
+      });
+      if (!currentStock || currentStock.filledStock < parsed.quantityDelivered) {
+        throw new Error(`Insufficient stock available. Current stock: ${currentStock?.filledStock || 0} cylinders.`);
+      }
 
-        await tx.inventoryTransaction.create({
+      await tx.inventory.update({
+        where: { cylinderType: parsed.cylinderType },
+        data: {
+          filledStock: { decrement: parsed.quantityDelivered },
+          emptyStock: { increment: parsed.emptyReturned }
+        }
+      });
+
+      await tx.inventoryTransaction.create({
+        data: {
+          transactionDate: new Date(parsed.deliveryDate),
+          eventType: 'DELIVERY',
+          referenceId: delivery.id,
+          cylinderType: parsed.cylinderType,
+          filledChange: -parsed.quantityDelivered,
+          emptyChange: parsed.emptyReturned,
+          remarks: `Billing refill entry to customer`
+        }
+      });
+
+      if (parsed.cylinderType === 'COMMERCIAL_19' || parsed.paymentMode === 'CREDIT') {
+        const ledgerStatus = parsed.amountReceived >= totalAmount ? 'clear' : (parsed.amountReceived > 0 ? 'partially_clear' : 'pending');
+        
+        await tx.commercialLedger.create({
           data: {
-            transactionDate: new Date(parsed.deliveryDate),
-            eventType: 'DELIVERY',
-            referenceId: delivery.id,
+            customerId: parsed.customerId || null,
+            customerName: parsed.customerName,
+            consumerNumber: parsed.consumerNumber || null,
+            mobileNumber: parsed.mobileNumber || null,
+            address: parsed.address || null,
+            deliveryId: delivery.id,
             cylinderType: parsed.cylinderType,
-            filledChange: -parsed.quantityDelivered,
-            emptyChange: parsed.emptyReturned,
-            remarks: `Billing delivery to customer`
+            quantityDelivered: parsed.quantityDelivered,
+            emptyReturned: parsed.emptyReturned,
+            emptyPending: parsed.quantityDelivered - parsed.emptyReturned,
+            amountBilled: totalAmount,
+            amountReceived: parsed.amountReceived,
+            amountPending: totalAmount - parsed.amountReceived,
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            status: ledgerStatus
           }
         });
+      }
 
-        if (parsed.cylinderType === 'COMMERCIAL_19' || parsed.paymentMode === 'CREDIT') {
-          const ledgerStatus = parsed.amountReceived >= totalAmount ? 'clear' : (parsed.amountReceived > 0 ? 'partially_clear' : 'pending');
-          
-          await tx.commercialLedger.create({
-            data: {
-              customerId: parsed.customerId || null,
-              customerName: parsed.customerName,
-              consumerNumber: parsed.consumerNumber || null,
-              mobileNumber: parsed.mobileNumber || null,
-              address: parsed.address || null,
-              deliveryId: delivery.id,
-              cylinderType: parsed.cylinderType,
-              quantityDelivered: parsed.quantityDelivered,
-              emptyReturned: parsed.emptyReturned,
-              emptyPending: parsed.quantityDelivered - parsed.emptyReturned,
-              amountBilled: totalAmount,
-              amountReceived: parsed.amountReceived,
-              amountPending: totalAmount - parsed.amountReceived,
-              dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-              status: ledgerStatus
-            }
-          });
-        }
-
-        // Increment active load cycle counters
-        if (activeLoadCycle) {
-          await tx.loadCycle.update({
-            where: { id: activeLoadCycle.id },
-            data: {
-              deliveriesCompleted: { increment: parsed.quantityDelivered },
-              emptyReturns: { increment: parsed.emptyReturned }
-            }
-          });
-        }
+      // Increment active load cycle counters
+      if (activeLoadCycle) {
+        await tx.loadCycle.update({
+          where: { id: activeLoadCycle.id },
+          data: {
+            deliveriesCompleted: { increment: parsed.quantityDelivered },
+            emptyReturns: { increment: parsed.emptyReturned }
+          }
+        });
       }
 
       return delivery;
@@ -816,26 +928,6 @@ export async function submitConnection(data) {
       });
 
       if (verificationStatus === 'APPROVED') {
-        // Update stock
-        await tx.inventory.update({
-          where: { cylinderType: 'DOMESTIC_14_2' },
-          data: {
-            filledStock: { decrement: issuedCount }
-          }
-        });
-
-        // Log transaction
-        await tx.inventoryTransaction.create({
-          data: {
-            transactionDate: new Date(parsed.connectionDate),
-            eventType: 'CONNECTION_ISSUED',
-            referenceId: connection.id,
-            cylinderType: 'DOMESTIC_14_2',
-            filledChange: -issuedCount,
-            remarks: `Issued ${parsed.connectionType} contract to customer ${parsed.customerName}`
-          }
-        });
-
         // Log Kyc / CardBook counters
         if (parsed.eKycDone && parsed.eKycCharges > 0) {
           await tx.kycCardBookTransaction.create({
@@ -984,7 +1076,7 @@ const ClosingSchema = z.object({
 
 export async function submitDailyClosing(data) {
   try {
-    const user = await checkAuth(['ADMIN', 'MANAGER']);
+    const user = await checkAuth(['ADMIN', 'MANAGER', 'AUDITOR']);
     const parsed = ClosingSchema.parse(data);
 
     const result = await prisma.$transaction(async (tx) => {
@@ -996,6 +1088,11 @@ export async function submitDailyClosing(data) {
       const expected14E = dom.emptyStock;
       const expected19F = comm.filledStock;
       const expected19E = comm.emptyStock;
+
+      const m14F = parsed.physical14Filled - expected14F;
+      const m14E = parsed.physical14Empty - expected14E;
+      const m19F = parsed.physical19Filled - expected19F;
+      const m19E = parsed.physical19Empty - expected19E;
 
       const dateVal = new Date(parsed.closingDate);
       const closing = await tx.dailyClosing.upsert({
@@ -1013,6 +1110,10 @@ export async function submitDailyClosing(data) {
           expected14Empty: expected14E,
           expected19Filled: expected19F,
           expected19Empty: expected19E,
+          mismatch14Filled: m14F,
+          mismatch14Empty: m14E,
+          mismatch19Filled: m19F,
+          mismatch19Empty: m19E,
           isLocked: true,
           remarks: parsed.remarks
         },
@@ -1029,6 +1130,10 @@ export async function submitDailyClosing(data) {
           expected14Empty: expected14E,
           expected19Filled: expected19F,
           expected19Empty: expected19E,
+          mismatch14Filled: m14F,
+          mismatch14Empty: m14E,
+          mismatch19Filled: m19F,
+          mismatch19Empty: m19E,
           cashInHand: parsed.cashInHand,
           isLocked: true,
           remarks: parsed.remarks
@@ -1053,19 +1158,18 @@ export async function submitDailyClosing(data) {
         }
       });
 
-      const m14F = parsed.physical14Filled - expected14F;
-      const m14E = parsed.physical14Empty - expected14E;
-      const m19F = parsed.physical19Filled - expected19F;
+
 
       return {
         closing,
         mismatches: {
           mismatch14F: m14F,
           mismatch14E: m14E,
-          mismatch19F: m19F
+          mismatch19F: m19F,
+          mismatch19E: m19E
         },
         expected: {
-          expected14F, expected14E
+          expected14F, expected14E, expected19F, expected19E
         }
       };
     });
@@ -1606,6 +1710,9 @@ export async function approveVerificationEntry(id, type, correctedData = null) {
         let amountReceived = delivery.amountReceived;
         let cylinderType = delivery.deliveryItems[0]?.cylinderType || 'DOMESTIC_14_2';
 
+        const oldQtyDelivered = quantityDelivered;
+        const oldEmptyReturned = emptyReturned;
+
         if (correctedData) {
           if (correctedData.quantityDelivered !== undefined) quantityDelivered = parseInt(correctedData.quantityDelivered);
           if (correctedData.emptyReturned !== undefined) emptyReturned = parseInt(correctedData.emptyReturned);
@@ -1640,32 +1747,56 @@ export async function approveVerificationEntry(id, type, correctedData = null) {
           }
         });
 
-        await tx.inventory.update({
-          where: { cylinderType },
-          data: {
-            filledStock: { decrement: quantityDelivered },
-            emptyStock: { increment: emptyReturned }
-          }
-        });
+        // Calculate delta stock adjustments if there was corrected data
+        const deltaFilled = quantityDelivered - oldQtyDelivered;
+        const deltaEmpty = emptyReturned - oldEmptyReturned;
 
-        await tx.inventoryTransaction.create({
-          data: {
-            transactionDate: new Date(),
-            eventType: 'DELIVERY',
-            referenceId: delivery.id,
-            cylinderType,
-            filledChange: -quantityDelivered,
-            emptyChange: emptyReturned,
-            remarks: `Approved delivery ledger billing`
+        if (deltaFilled !== 0 || deltaEmpty !== 0) {
+          if (deltaFilled > 0) {
+            const currentStock = await tx.inventory.findUnique({
+              where: { cylinderType }
+            });
+            if (!currentStock || currentStock.filledStock < deltaFilled) {
+              throw new Error(`Insufficient stock for modified delivery amount. Current stock: ${currentStock?.filledStock || 0}`);
+            }
           }
-        });
 
+          await tx.inventory.update({
+            where: { cylinderType },
+            data: {
+              filledStock: { decrement: deltaFilled },
+              emptyStock: { increment: deltaEmpty }
+            }
+          });
+
+          await tx.inventoryTransaction.create({
+            data: {
+              transactionDate: new Date(),
+              eventType: 'ADJUSTMENT',
+              referenceId: delivery.id,
+              cylinderType,
+              filledChange: -deltaFilled,
+              emptyChange: deltaEmpty,
+              remarks: `Admin correction of delivery quantity during verification`
+            }
+          });
+        }
+
+        // Adjust or create Commercial Ledger
         if (cylinderType === 'COMMERCIAL_19' || totalAmount - amountReceived > 0) {
           const ledgerStatus = amountReceived >= totalAmount ? 'clear' : (amountReceived > 0 ? 'partially_clear' : 'pending');
           
+          await tx.commercialLedger.deleteMany({
+            where: { deliveryId: delivery.id }
+          });
+
           await tx.commercialLedger.create({
             data: {
-              customerId: delivery.customerId,
+              customerId: delivery.customerId || null,
+              customerName: delivery.customerName,
+              consumerNumber: delivery.consumerNumber || null,
+              mobileNumber: delivery.mobileNumber || null,
+              address: delivery.address || null,
               deliveryId: delivery.id,
               cylinderType,
               quantityDelivered,
@@ -1705,23 +1836,8 @@ export async function approveVerificationEntry(id, type, correctedData = null) {
           }
         });
 
-        await tx.inventory.update({
-          where: { cylinderType: 'DOMESTIC_14_2' },
-          data: {
-            filledStock: { decrement: connection.issuedCylindersCount }
-          }
-        });
-
-        await tx.inventoryTransaction.create({
-          data: {
-            transactionDate: new Date(),
-            eventType: 'CONNECTION_ISSUED',
-            referenceId: connection.id,
-            cylinderType: 'DOMESTIC_14_2',
-            filledChange: -connection.issuedCylindersCount,
-            remarks: `Approved Connection issued contract`
-          }
-        });
+        // Connection registration does not reduce cylinder stock immediately.
+        // Actual stock reduction happens only when a cylinder is physically issued (refill entry).
 
         // Log Kyc / CardBook counters
         if (connection.eKycDone && connection.eKycCharges > 0) {
@@ -1999,6 +2115,36 @@ export async function rejectVerificationEntry(id, type, reason) {
       const existing = await tx[tableName].findUnique({ where: { id } });
       if (!existing) {
         throw new Error(`Pending entry ${id} not found.`);
+      }
+
+      if (type === 'DELIVERY' && existing.verificationStatus !== 'REJECTED') {
+        // If it's a delivery refill, we must reverse the stock decrement and empty increment
+        const deliveryWithItems = await tx.delivery.findUnique({
+          where: { id },
+          include: { deliveryItems: true }
+        });
+        const item = deliveryWithItems?.deliveryItems?.[0];
+        if (item) {
+          await tx.inventory.update({
+            where: { cylinderType: item.cylinderType },
+            data: {
+              filledStock: { increment: item.quantityDelivered },
+              emptyStock: { decrement: item.emptyReturned }
+            }
+          });
+
+          await tx.inventoryTransaction.create({
+            data: {
+              transactionDate: new Date(),
+              eventType: 'REVERSAL',
+              referenceId: id,
+              cylinderType: item.cylinderType,
+              filledChange: item.quantityDelivered,
+              emptyChange: -item.emptyReturned,
+              remarks: `Stock reversal for rejected refill entry: ${reason}`
+            }
+          });
+        }
       }
 
       const updatedRemarks = (existing.remarks || '') + remarksSuffix;

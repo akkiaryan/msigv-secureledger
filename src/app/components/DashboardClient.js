@@ -46,6 +46,45 @@ export default function DashboardClient({ initialData, user }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [successFormPayload, setSuccessFormPayload] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [settingsForm, setSettingsForm] = useState({
+    domesticRate: 950.0,
+    commercialRate: 1950.0,
+    eKycFee: 50.0,
+    cardBookFee: 100.0
+  });
+
+  const [openingStockForm, setOpeningStockForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    filled14: 0,
+    empty14: 0,
+    filled19: 0,
+    empty19: 0,
+    regulators: 0,
+    hosePipes: 0,
+    openingCash: 0,
+    remarks: ''
+  });
+
+  const [refillForm, setRefillForm] = useState({
+    refillType: 'DOMESTIC_14_2',
+    deliveryDate: new Date().toISOString().split('T')[0],
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
+    employeeId: initialData.employees?.[0]?.id || '',
+    quantityDelivered: 1,
+    emptyReturned: 1,
+    paymentMode: 'CASH',
+    amountReceived: 950,
+    ratePerCylinder: 950,
+    dacCode: '',
+    dacVerified: false,
+    remarks: ''
+  });
   const [printData, setPrintData] = useState(null);
 
   // Selected report type
@@ -458,7 +497,7 @@ export default function DashboardClient({ initialData, user }) {
   };
 
   useEffect(() => {
-    if (activeForm === 'connection') {
+    if (activeTab === 'connection') {
       const total = calculateConnectionPricing(connectionForm);
       setConnectionForm(prev => {
         const keepPaidInSync = prev.amountPaid === prev.totalAmount || prev.amountPaid === 0;
@@ -478,7 +517,7 @@ export default function DashboardClient({ initialData, user }) {
     connectionForm.stoveIncluded,
     connectionForm.eKycDone,
     connectionForm.eKycCharges,
-    activeForm
+    activeTab
   ]);
 
   // Submit Operations
@@ -488,7 +527,58 @@ export default function DashboardClient({ initialData, user }) {
     let details = {};
 
     try {
-      if (formType === 'customer') {
+      if (formType === 'opening_stock') {
+        const payload = {
+          date: openingStockForm.date,
+          filled14: parseInt(openingStockForm.filled14),
+          empty14: parseInt(openingStockForm.empty14),
+          filled19: parseInt(openingStockForm.filled19),
+          empty19: parseInt(openingStockForm.empty19),
+          regulators: parseInt(openingStockForm.regulators || 0),
+          hosePipes: parseInt(openingStockForm.hosePipes || 0),
+          openingCash: parseFloat(openingStockForm.openingCash || 0),
+          remarks: openingStockForm.remarks
+        };
+        res = await actions.initializeOpeningStock(payload);
+        details = {
+          date: payload.date,
+          filled14: `${payload.filled14} units`,
+          empty14: `${payload.empty14} units`,
+          filled19: `${payload.filled19} units`,
+          empty19: `${payload.empty19} units`
+        };
+      } else if (formType === 'refill') {
+        if (refillForm.dacCode && !/^\d{6}$/.test(refillForm.dacCode)) {
+          showFeedback('error', 'DAC verification code must be exactly 6 digits and numeric only');
+          setIsSubmitting(false);
+          return;
+        }
+        const payload = {
+          deliveryDate: refillForm.deliveryDate,
+          customerId: refillForm.linkExistingCustomer ? refillForm.customerId : null,
+          customerName: refillForm.customerName,
+          consumerNumber: refillForm.consumerNumber || null,
+          mobileNumber: refillForm.mobileNumber || null,
+          address: refillForm.address || null,
+          employeeId: refillForm.employeeId,
+          cylinderType: refillForm.refillType,
+          quantityDelivered: parseInt(refillForm.quantityDelivered),
+          emptyReturned: parseInt(refillForm.emptyReturned),
+          ratePerCylinder: parseFloat(refillForm.ratePerCylinder),
+          amountReceived: parseFloat(refillForm.amountReceived),
+          dacCode: refillForm.dacCode || null,
+          dacVerified: refillForm.dacVerified,
+          remarks: refillForm.remarks,
+          paymentMode: refillForm.paymentMode
+        };
+        res = await actions.submitDelivery(payload);
+        details = {
+          customer: payload.customerName || 'Walk-in',
+          cylinders: `${payload.quantityDelivered} x ${payload.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'}`,
+          amountReceived: `₹${payload.amountReceived}`,
+          rate: `₹${payload.ratePerCylinder}`
+        };
+      } else if (formType === 'customer') {
         res = await actions.createCustomer(customerForm);
         details = {
           name: customerForm.name,
@@ -739,6 +829,12 @@ export default function DashboardClient({ initialData, user }) {
   const resetActiveForm = () => {
     setSuccessFormPayload(null);
     setActiveForm(null);
+    setActiveTab('dashboard');
+  };
+
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    showFeedback('success', 'Pricing and fee settings updated successfully.');
   };
 
   const handleCreateCommercialCustomer = async () => {
@@ -1081,97 +1177,221 @@ export default function DashboardClient({ initialData, user }) {
         </div>
       )}
 
+      {/* Global 80px Top Header */}
+      <header className="h-[80px] fixed top-0 left-0 right-0 bg-white border-b border-[#D7DEE8] px-6 flex items-center justify-between z-[100] print:hidden">
+        {/* Left Side: Logo & Title */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#001F5B] rounded flex items-center justify-center text-white font-bold text-lg select-none">
+            IOCL
+          </div>
+          <div>
+            <h1 className="text-base font-bold text-[#001F5B] leading-none uppercase tracking-wide">
+              Maa Santoshi Indane Gramin Vitrak
+            </h1>
+            <p className="text-[10px] text-gray-500 font-semibold tracking-wider mt-0.5 uppercase">
+              LPG SecureLedger Portal
+            </p>
+          </div>
+        </div>
+
+        {/* Center: User Info & Status */}
+        <div className="hidden md:flex flex-col items-center text-center">
+          <div className="flex items-center gap-2 bg-[#001F5B]/5 px-3 py-1 rounded border border-[#001F5B]/10">
+            <User className="w-3.5 h-3.5 text-[#001F5B]" />
+            <span className="text-xs font-bold text-[#001F5B] uppercase tracking-wider">
+              {user.name} ({user.role})
+            </span>
+          </div>
+          <span className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-ping"></span>
+            System Online & Secure
+          </span>
+        </div>
+
+        {/* Right Side: Flag, Date, Default Rates */}
+        <div className="flex items-center gap-4 text-right">
+          <div className="hidden sm:flex flex-col text-[10px] text-gray-600 font-semibold">
+            <div>DOMESTIC 14.2kg: <span className="text-[#001F5B] font-bold font-mono">₹{settingsForm.domesticRate}</span></div>
+            <div>COMMERCIAL 19kg: <span className="text-[#001F5B] font-bold font-mono">₹{settingsForm.commercialRate}</span></div>
+          </div>
+          <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+          <div className="flex flex-col items-end">
+            <svg className="w-6 h-4 border border-gray-200" viewBox="0 0 3 2">
+              <rect width="3" height="2" fill="#F4C2C2"/>
+              <rect width="3" height="0.66" fill="#FF9933"/>
+              <rect y="1.33" width="3" height="0.66" fill="#128807"/>
+              <rect y="0.66" width="3" height="0.67" fill="#FFFFFF"/>
+              <circle cx="1.5" cy="1" r="0.2" fill="#000080"/>
+              <circle cx="1.5" cy="1" r="0.1" fill="#FFFFFF"/>
+              <circle cx="1.5" cy="1" r="0.05" fill="#000080"/>
+            </svg>
+            <span className="text-[9px] font-mono text-gray-500 font-bold mt-1">
+              {new Date().toISOString().split('T')[0]}
+            </span>
+          </div>
+        </div>
+      </header>
+
       {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="app-sidebar print:hidden">
+      <aside className="app-sidebar print:hidden" style={{ top: '80px', height: 'calc(100vh - 80px)' }}>
         <div className="brand-section">
           <img src="/logo.svg" alt="IOCL Logo" style={{ width: '36px', height: '40px', objectFit: 'contain' }} />
           <div className="brand-title">
-            <h2 className="font-bold text-[#02164F] text-xs leading-tight">Maa Santoshi Indane</h2>
+            <h2 className="font-bold text-[#001F5B] text-xs leading-tight">Maa Santoshi Indane</h2>
             <p className="text-[9px] text-[#F37022] font-bold uppercase tracking-wider">Gramin Vitrak</p>
           </div>
         </div>
 
-        <nav className="sidebar-nav flex-1 space-y-1">
-          {/* Main Command Center dashboard tab */}
+        <nav className="sidebar-nav flex-1 space-y-1 overflow-y-auto">
+          {/* Main Dashboard item */}
           <div 
-            className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'dashboard' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+            className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'dashboard' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
             onClick={() => { setActiveTab('dashboard'); setActiveForm(null); }}
           >
             <LayoutDashboard className="w-4 h-4" />
-            <span>Dashboard</span>
+            <span className="nav-text">{isAuditor ? 'Audit Dashboard' : 'Dashboard'}</span>
           </div>
 
-          {/* Admin Sidebar Links */}
+          {/* ADMIN SIDEBAR LINKS */}
           {isAdmin && (
             <>
+              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'forms' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('forms'); setActiveForm(null); }}
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
               >
-                <Plus className="w-4 h-4 text-[#F37022]" />
-                <span>Operational Forms</span>
+                <RefreshCw className="w-4 h-4" />
+                <span className="nav-text">Cylinder Refill Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="nav-text">New Connection (SBC/DBC)</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
+              >
+                <AlertOctagon className="w-4 h-4" />
+                <span className="nav-text">Incident / Complaint Entry</span>
+              </div>
+
+              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">MANAGEMENT</div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
               >
-                <Users className="w-4 h-4" />
-                <span>Commercial Credit</span>
+                <Receipt className="w-4 h-4" />
+                <span className="nav-text">Commercial Credit</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
+              >
+                <Lock className="w-4 h-4" />
+                <span className="nav-text">Daily Closing</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
-                <span>Reports & Audits</span>
+                <span className="nav-text">Reports & Downloads</span>
               </div>
+
+              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">ADMINISTRATION</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'closings' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('closings'); setActiveForm(null); }}
-              >
-                <Lock className="w-4 h-4" />
-                <span>Daily Closings</span>
-              </div>
-              <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'staff' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'staff' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('staff'); setActiveForm(null); }}
               >
                 <Users className="w-4 h-4" />
-                <span>Staff Control</span>
+                <span className="nav-text">Staff Management</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'data_management' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('data_management'); setActiveForm(null); }}
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'archive' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('archive'); setActiveForm(null); }}
               >
                 <Database className="w-4 h-4" />
-                <span>Data Management</span>
+                <span className="nav-text">Data Archive</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'settings' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('settings'); setActiveForm(null); }}
+              >
+                <Lock className="w-4 h-4" />
+                <span className="nav-text">Settings</span>
               </div>
             </>
           )}
 
-          {/* Auditor Sidebar Links */}
-          {isAuditor && (
+          {/* EMPLOYEE SIDEBAR LINKS */}
+          {isEmployee && (
             <>
+              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
               >
-                <Users className="w-4 h-4" />
-                <span>Commercial Credit</span>
+                <RefreshCw className="w-4 h-4" />
+                <span className="nav-text">Cylinder Refill Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="nav-text">New Connection (SBC/DBC)</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
+              >
+                <AlertOctagon className="w-4 h-4" />
+                <span className="nav-text">Incident / Complaint Entry</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'my_entries' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('my_entries'); setActiveForm(null); }}
+              >
+                <FileText className="w-4 h-4" />
+                <span className="nav-text">My Entries</span>
+              </div>
+            </>
+          )}
+
+          {/* AUDITOR SIDEBAR LINKS */}
+          {isAuditor && (
+            <>
+              <div className="sidebar-heading text-[10px] font-bold uppercase tracking-wider text-[#001F5B] px-3 pt-4 pb-1">AUDIT</div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                <span className="nav-text">Daily Closing Verification</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
+              >
+                <Receipt className="w-4 h-4" />
+                <span className="nav-text">Account Ledger</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
-                <span>Reports & Audits</span>
+                <span className="nav-text">Reports & Downloads</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'closings' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('closings'); setActiveForm(null); }}
+                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'auditor_uploads' ? 'bg-[#001F5B]/5 text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('auditor_uploads'); setActiveForm(null); }}
               >
-                <Lock className="w-4 h-4" />
-                <span>Daily Closings</span>
+                <Database className="w-4 h-4" />
+                <span className="nav-text">Auditor Uploads</span>
               </div>
             </>
           )}
@@ -1181,7 +1401,7 @@ export default function DashboardClient({ initialData, user }) {
         <div className="sidebar-footer border-t border-[#E8EAF0] pt-4 mt-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#02164F]/10 flex items-center justify-center font-bold text-[#02164F] text-xs">
+              <div className="w-8 h-8 rounded-full bg-[#001F5B]/10 flex items-center justify-center font-bold text-[#001F5B] text-xs">
                 {user.name.substring(0,2).toUpperCase()}
               </div>
               <div className="text-xs">
@@ -1200,34 +1420,180 @@ export default function DashboardClient({ initialData, user }) {
         </div>
       </aside>
 
-      {/* MOBILE HEADER/NAV */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-[#E8EAF0] px-4 flex items-center justify-between z-50 print:hidden">
-        <div className="flex items-center gap-2">
-          <img src="/logo.svg" alt="IOCL Logo" className="w-6 h-7 object-contain" />
-          <span className="font-bold text-[#02164F] text-xs leading-tight">Maa Santoshi Indane Gramin Vitrak</span>
-        </div>
-        <button 
-          onClick={() => signOut({ callbackUrl: '/sign-in' })} 
-          className="text-red-500 p-1 hover:bg-red-50 rounded"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
-      </div>
-
       {/* MAIN CONTAINER */}
-      <main className="app-content pt-16 md:pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
-        {/* TOP STATUS BAR */}
-        <div className="top-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
-          <div className="search-container flex items-center gap-2 bg-white border border-[#E8EAF0] px-3 py-1.5 rounded-lg flex-1 max-w-md">
-            <Search className="w-4 h-4 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search consumer number, customers or DAC code..." 
-              className="w-full text-sm outline-none bg-transparent"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+      <main className="app-content mt-[80px] pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
+        {!dbData.isInitialized ? (
+          /* SYSTEM NOT INITIALIZED GATE */
+          <div className="max-w-4xl mx-auto my-8">
+            {isAdmin || user.role === 'AUDITOR' ? (
+              /* Setup Form Panel for Admin / Auditor */
+              <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-md">
+                <div className="border-b border-[#D7DEE8] pb-4 mb-6">
+                  <h2 className="text-xl font-bold text-[#001F5B] uppercase tracking-wide">
+                    Initialize LPG Opening Stock Setup
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    The ledger database requires the starting stock balances to begin logging transactions.
+                  </p>
+                </div>
+                {feedback && feedback.type === 'error' && (
+                  <div className="bg-red-50 text-red-700 p-3 rounded text-xs font-semibold mb-4">
+                    {feedback.message}
+                  </div>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleFormSubmit('opening_stock');
+                  }}
+                  className="space-y-6"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {/* Date */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Setup Date*</label>
+                      <input
+                        type="date"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
+                        value={openingStockForm.date}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, date: e.target.value }))}
+                      />
+                    </div>
+                    {/* Domestic Filled */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Domestic 14.2kg Filled Stock*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.filled14}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, filled14: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Domestic Empty */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Domestic 14.2kg Empty Stock*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.empty14}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, empty14: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Commercial Filled */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Commercial 19kg Filled Stock*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.filled19}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, filled19: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Commercial Empty */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Commercial 19kg Empty Stock*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.empty19}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, empty19: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Regulators */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Regulators Qty*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.regulators}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, regulators: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Hose Pipes */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Suraksha Hose Pipes Qty*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.hosePipes}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, hosePipes: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Opening Cash */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold">
+                      <label className="text-gray-700">Opening Treasury Cash (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                        value={openingStockForm.openingCash}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, openingCash: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1 text-xs font-semibold sm:col-span-2 md:col-span-3">
+                      <label className="text-gray-700">Remarks / Reference</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Starting opening balances setup"
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-normal"
+                        value={openingStockForm.remarks}
+                        onChange={e => setOpeningStockForm(prev => ({ ...prev, remarks: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-gray-100 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="px-6 py-3 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 disabled:opacity-50"
+                    >
+                      {isSubmitting ? 'Initializing Stock...' : 'Save & Initialize Portal'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              /* Plain message Screen for Employee */
+              <div className="bg-white border border-[#D7DEE8] rounded-xl p-8 shadow-md text-center max-w-md mx-auto my-12">
+                <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
+                <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
+                  System Not Initialized
+                </h3>
+                <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                  System is not initialized. Please ask the Administrator to set the opening stock first.
+                </p>
+              </div>
+            )}
           </div>
+        ) : (
+          <>
+            {/* TOP STATUS BAR */}
+            <div className="top-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
+              <div className="search-container flex items-center gap-2 bg-white border border-[#E8EAF0] px-3 py-1.5 rounded-lg flex-1 max-w-md">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search consumer number, customers or DAC code..." 
+                  className="w-full text-sm outline-none bg-transparent"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
           <div className="flex items-center gap-3 justify-end">
             <span className="text-[11px] text-gray-500 flex items-center gap-1">
               <ShieldCheck className="w-4 h-4 text-green-600" />
@@ -1243,18 +1609,9 @@ export default function DashboardClient({ initialData, user }) {
           </div>
         </div>
 
-        {/* ------------------- OPERATIONAL FORMS PANEL ------------------- */}
-        {activeForm ? (
-          <div>
-            <button 
-              onClick={resetActiveForm}
-              className="mb-4 inline-flex items-center gap-1 text-xs font-semibold text-[#02164F] hover:underline"
-            >
-              &larr; Back to Dashboard
-            </button>
-
-            {/* Render selected form wrapped in GenericFormShell */}
-            {activeForm === 'customer' && (
+        {/* ------------------- MAIN TAB RENDERINGS ------------------- */}
+        <div>
+            {activeTab === 'customer' && (
               <GenericFormShell
                 title="1. Customer Creation Form"
                 subtitle="Create a domestic/commercial customer profile in the ledger"
@@ -1335,39 +1692,107 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'domestic' && (
+            {activeTab === 'refill' && (
               <GenericFormShell
-                title="2. Domestic Refill Delivery Form"
-                subtitle="Record domestic LPG sales (14.2 kg cylinder refills)"
+                title="Cylinder Refill Entry Form"
+                subtitle="Log cylinder refill sales for domestic (14.2 kg) or commercial (19 kg) customers."
                 instructions={[
-                  "Entering a delivery decrements domestic filled stock and increments empties.",
-                  "A delivery status of PENDING does not trigger inventory changes until Approved."
+                  "Select the correct Refill Cylinder Type to apply the default settings rate.",
+                  "DAC Code is required for domestic sales if applicable (6 digits)."
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setDomesticForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CASH', amountReceived: 950, ratePerCylinder: 950, dacCode: '', dacVerified: false, remarks: '' }); }}
+                onReset={() => {
+                  setSuccessFormPayload(null);
+                  setRefillForm({
+                    refillType: 'DOMESTIC_14_2',
+                    deliveryDate: new Date().toISOString().split('T')[0],
+                    customerId: '',
+                    linkExistingCustomer: false,
+                    customerName: '',
+                    consumerNumber: '',
+                    mobileNumber: '',
+                    address: '',
+                    employeeId: dbData.employees?.[0]?.id || '',
+                    quantityDelivered: 1,
+                    emptyReturned: 1,
+                    paymentMode: 'CASH',
+                    amountReceived: settingsForm.domesticRate,
+                    ratePerCylinder: settingsForm.domesticRate,
+                    dacCode: '',
+                    dacVerified: false,
+                    remarks: ''
+                  });
+                }}
                 onClose={resetActiveForm}
-                onSubmit={() => handleFormSubmit('domestic')}
+                onSubmit={() => handleFormSubmit('refill')}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Refill Type Toggle */}
+                  <div className="sm:col-span-2 flex flex-col gap-1 text-xs">
+                    <label className="font-semibold text-gray-700">Refill Cylinder Type*</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefillForm(prev => ({
+                            ...prev,
+                            refillType: 'DOMESTIC_14_2',
+                            ratePerCylinder: settingsForm.domesticRate,
+                            amountReceived: settingsForm.domesticRate * prev.quantityDelivered,
+                            paymentMode: 'CASH'
+                          }));
+                        }}
+                        className={`py-3 px-4 border rounded text-xs font-bold transition text-center uppercase tracking-wider ${
+                          refillForm.refillType === 'DOMESTIC_14_2'
+                            ? 'bg-[#001F5B] text-white border-[#001F5B]'
+                            : 'bg-white text-[#001F5B] border-[#D7DEE8] hover:bg-gray-50'
+                        }`}
+                      >
+                        Domestic (14.2 kg)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefillForm(prev => ({
+                            ...prev,
+                            refillType: 'COMMERCIAL_19',
+                            ratePerCylinder: settingsForm.commercialRate,
+                            amountReceived: 0,
+                            paymentMode: 'CREDIT'
+                          }));
+                        }}
+                        className={`py-3 px-4 border rounded text-xs font-bold transition text-center uppercase tracking-wider ${
+                          refillForm.refillType === 'COMMERCIAL_19'
+                            ? 'bg-[#001F5B] text-white border-[#001F5B]'
+                            : 'bg-white text-[#001F5B] border-[#D7DEE8] hover:bg-gray-50'
+                        }`}
+                      >
+                        Commercial (19 kg)
+                      </button>
+                    </div>
+                  </div>
+ 
+                  {/* Delivery Date */}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Delivery Date*</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.deliveryDate} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                    <input
+                      type="date"
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.deliveryDate}
+                      onChange={e => setRefillForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
                     />
                   </div>
-                  {renderCustomerSection('domestic', domesticForm, setDomesticForm)}
+ 
+                  {/* Delivery Staff */}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Delivery Staff*</label>
-                    <select 
+                    <select
                       required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={domesticForm.employeeId} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
+                      value={refillForm.employeeId}
+                      onChange={e => setRefillForm(prev => ({ ...prev, employeeId: e.target.value }))}
                     >
                       <option value="">-- Choose Staff --</option>
                       {dbData.employees.map(emp => (
@@ -1375,194 +1800,132 @@ export default function DashboardClient({ initialData, user }) {
                       ))}
                     </select>
                   </div>
+ 
+                  {/* Customer Details section */}
+                  {renderCustomerSection(
+                    refillForm.refillType === 'COMMERCIAL_19' ? 'commercial' : 'refill',
+                    refillForm,
+                    setRefillForm
+                  )}
+ 
+                  {/* Quantity Delivered */}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Cylinders Delivered (Qty)*</label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.quantityDelivered} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, quantityDelivered: e.target.value }))}
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.quantityDelivered}
+                      onChange={e => {
+                        const qty = parseInt(e.target.value) || 0;
+                        setRefillForm(prev => ({
+                          ...prev,
+                          quantityDelivered: qty,
+                          amountReceived: prev.paymentMode === 'CREDIT' ? 0 : qty * prev.ratePerCylinder
+                        }));
+                      }}
                     />
                   </div>
+ 
+                  {/* Quantity Empty Returned */}
                   <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Empties Returned (Qty)</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.emptyReturned} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, emptyReturned: e.target.value }))}
+                    <label className="font-semibold text-gray-700">Empties Returned (Qty)*</label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.emptyReturned}
+                      onChange={e => setRefillForm(prev => ({ ...prev, emptyReturned: parseInt(e.target.value) || 0 }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">DAC Verification Code (Distributor Authorised Code)</label>
-                    <input 
-                      type="text" 
-                      maxLength={6}
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      placeholder="e.g. 123456"
-                      value={domesticForm.dacCode} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, dacCode: e.target.value }))}
-                    />
-                  </div>
+ 
+                  {/* Rate per Cylinder */}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Rate per Cylinder (INR)*</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.ratePerCylinder} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, ratePerCylinder: e.target.value }))}
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.ratePerCylinder}
+                      onChange={e => {
+                        const rate = parseFloat(e.target.value) || 0;
+                        setRefillForm(prev => ({
+                          ...prev,
+                          ratePerCylinder: rate,
+                          amountReceived: prev.paymentMode === 'CREDIT' ? 0 : prev.quantityDelivered * rate
+                        }));
+                      }}
                     />
                   </div>
+ 
+                  {/* Payment Mode */}
                   <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Payment Method*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={domesticForm.paymentMode} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, paymentMode: e.target.value }))}
+                    <label className="font-semibold text-gray-700">Payment Mode*</label>
+                    <select
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
+                      value={refillForm.paymentMode}
+                      onChange={e => {
+                        const mode = e.target.value;
+                        setRefillForm(prev => ({
+                          ...prev,
+                          paymentMode: mode,
+                          amountReceived: mode === 'CREDIT' ? 0 : prev.quantityDelivered * prev.ratePerCylinder
+                        }));
+                      }}
                     >
                       <option value="CASH">Cash in Hand</option>
-                      <option value="UPI">UPI Payment</option>
-                      <option value="CREDIT">Store Credit (Rollover)</option>
+                      <option value="UPI">UPI Digital Payment</option>
+                      <option value="CREDIT">Store Credit / Outstanding</option>
                     </select>
                   </div>
+ 
+                  {/* Amount Received */}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Amount Received (INR)*</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.amountReceived} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, amountReceived: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
-                    <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
-                    <input 
-                      type="text" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={domesticForm.remarks} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, remarks: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </GenericFormShell>
-            )}
-
-            {activeForm === 'commercial' && (
-              <GenericFormShell
-                title="3. Commercial Refill Delivery Form"
-                subtitle="Record commercial LPG sales (19 kg cylinder refills)"
-                instructions={[
-                  "Entering a delivery decrements commercial filled stock and increments commercial empty stock.",
-                  "Rollovers and empties pending will automatically update the credit ledger if approved."
-                ]}
-                isSubmitting={isSubmitting}
-                successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setCommercialForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CREDIT', amountReceived: 0, ratePerCylinder: 1950, remarks: '' }); }}
-                onClose={resetActiveForm}
-                onSubmit={() => handleFormSubmit('commercial')}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Delivery Date*</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.deliveryDate} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                    />
-                  </div>
-                  {renderCustomerSection('commercial', commercialForm, setCommercialForm)}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Delivery Staff*</label>
-                    <select 
+                    <input
+                      type="number"
+                      min="0"
                       required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={commercialForm.employeeId} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, employeeId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Staff --</option>
-                      {dbData.employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Cylinders Delivered (Qty)*</label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.quantityDelivered} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, quantityDelivered: e.target.value }))}
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.amountReceived}
+                      onChange={e => setRefillForm(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Empties Returned (Qty)</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.emptyReturned} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, emptyReturned: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Rate per Cylinder (INR)*</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.ratePerCylinder} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, ratePerCylinder: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Payment Method*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={commercialForm.paymentMode} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, paymentMode: e.target.value }))}
-                    >
-                      <option value="CREDIT">Store Credit (Outstanding)</option>
-                      <option value="CASH">Cash Collection</option>
-                      <option value="UPI">UPI/Online Payment</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Amount Received (INR)*</label>
-                    <input 
-                      type="number" 
-                      min="0" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.amountReceived} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, amountReceived: e.target.value }))}
-                    />
-                  </div>
+ 
+                  {/* DAC Code (Domestic only) */}
+                  {refillForm.refillType === 'DOMESTIC_14_2' && (
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">DAC Code (6-digit Distributor Code)</label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="e.g. 123456"
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-mono"
+                        value={refillForm.dacCode}
+                        onChange={e => setRefillForm(prev => ({ ...prev, dacCode: e.target.value }))}
+                      />
+                    </div>
+                  )}
+ 
+                  {/* Remarks */}
                   <div className="flex flex-col gap-1 text-xs sm:col-span-2">
                     <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
-                    <input 
-                      type="text" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={commercialForm.remarks} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, remarks: e.target.value }))}
+                    <input
+                      type="text"
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={refillForm.remarks}
+                      onChange={e => setRefillForm(prev => ({ ...prev, remarks: e.target.value }))}
                     />
                   </div>
                 </div>
               </GenericFormShell>
             )}
 
-            {activeForm === 'connection' && (
+            {activeTab === 'connection' && (
               <GenericFormShell
                 title="4. New Connection Form"
                 subtitle="Issue a new SBC/DBC connection contract (Domestic)"
@@ -1817,7 +2180,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'empty_return' && (
+            {activeTab === 'empty_return' && (
               <GenericFormShell
                 title="5. Empty Return Form"
                 subtitle="Record cylinder returns from a commercial or credit customer"
@@ -1878,7 +2241,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'load' && isAdmin && (
+            {activeTab === 'load' && isAdmin && (
               <GenericFormShell
                 title="6. refinery truck Unload Entry Form"
                 subtitle="Record incoming truck loads from LPG refinery bottling plants"
@@ -2035,7 +2398,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'closing' && isAdmin && (
+            {activeTab === 'closing' && isAdmin && (
               <GenericFormShell
                 title="7. Daily Closing stock count Form"
                 subtitle="Lock end-of-day godown stock counts and audit mismatches"
@@ -2150,7 +2513,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'incident' && (
+            {activeTab === 'incident' && (
               <GenericFormShell
                 title="8. Cylinder Incident / Damage Form"
                 subtitle="Isolate damaged, valve defect, or leaking cylinders immediately"
@@ -2369,7 +2732,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'expense' && isAdmin && (
+            {activeTab === 'expense' && isAdmin && (
               <GenericFormShell
                 title="9. Expense Entry Form"
                 subtitle="Record warehouse expenses, rent, or staff wage payments"
@@ -2456,7 +2819,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'payment' && (
+            {activeTab === 'payment' && (
               <GenericFormShell
                 title="10. Customer Payment Entry Form"
                 subtitle="Log payments received from credit/commercial customers"
@@ -2518,7 +2881,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'invoice' && isAdmin && (
+            {activeTab === 'invoice' && isAdmin && (
               <GenericFormShell
                 title="11. Custom Invoice Creation Form"
                 subtitle="Issue a commercial cylinder invoice"
@@ -2593,7 +2956,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeForm === 'stock_adjustment' && isAdmin && (
+            {activeTab === 'stock_adjustment' && isAdmin && (
               <GenericFormShell
                 title="12. Stock Adjustment Form"
                 subtitle="Tune warehouse stock balances directly with audit trails"
@@ -2669,10 +3032,192 @@ export default function DashboardClient({ initialData, user }) {
                 </div>
               </GenericFormShell>
             )}
-          </div>
-        ) : (
-          /* ------------------- MAIN TAB RENDERINGS ------------------- */
-          <div>
+ 
+            {activeTab === 'settings' && (
+              <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-sm max-w-2xl mx-auto my-8">
+                <div className="border-b border-[#D7DEE8] pb-4 mb-6">
+                  <h2 className="text-xl font-bold text-[#001F5B]">Default LPG Price & Fee Settings</h2>
+                  <p className="text-xs text-gray-500 mt-1">Configure default rates and charges used across billing and connection registration.</p>
+                </div>
+                <form onSubmit={handleSaveSettings} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Domestic Refill Rate (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
+                        value={settingsForm.domesticRate}
+                        onChange={e => setSettingsForm(prev => ({ ...prev, domesticRate: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Commercial Refill Rate (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
+                        value={settingsForm.commercialRate}
+                        onChange={e => setSettingsForm(prev => ({ ...prev, commercialRate: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">eKYC Verification Fee (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
+                        value={settingsForm.eKycFee}
+                        onChange={e => setSettingsForm(prev => ({ ...prev, eKycFee: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">LPG Card Book Fee (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800"
+                        value={settingsForm.cardBookFee}
+                        onChange={e => setSettingsForm(prev => ({ ...prev, cardBookFee: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('dashboard')}
+                      className="px-4 py-2 border border-[#D7DEE8] text-gray-700 text-xs font-bold rounded hover:bg-gray-50 uppercase tracking-wider"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition"
+                    >
+                      Save Settings
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+ 
+            {activeTab === 'auditor_uploads' && (
+              <GenericFormShell
+                title="Auditor Verification Upload"
+                subtitle="Submit physical verification audits and verification documents."
+                instructions={[
+                  "Upload physical count balance verification details for inventory reconciliation.",
+                  "Reference the appropriate Daily Closing cycle ID if auditing a specific date."
+                ]}
+                isSubmitting={isSubmitting}
+                successData={successFormPayload}
+                onReset={() => {
+                  setSuccessFormPayload(null);
+                  setAuditorVerificationForm({
+                    verificationDate: new Date().toISOString().split('T')[0],
+                    imageUrl: '',
+                    notes: '',
+                    closingId: ''
+                  });
+                }}
+                onSubmit={() => handleFormSubmit('auditor_verification')}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1 text-xs">
+                    <label className="font-semibold text-gray-700">Verification Date*</label>
+                    <input
+                      type="date"
+                      required
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={auditorVerificationForm.verificationDate}
+                      onChange={e => setAuditorVerificationForm(prev => ({ ...prev, verificationDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <label className="font-semibold text-gray-700">Select EOD Closing Date reference</label>
+                    <select
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
+                      value={auditorVerificationForm.closingId}
+                      onChange={e => setAuditorVerificationForm(prev => ({ ...prev, closingId: e.target.value }))}
+                    >
+                      <option value="">-- No Specific Closing Reference --</option>
+                      {dbData.dailyClosings?.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {new Date(c.closingDate).toLocaleDateString()} (14.2kg F: {c.physical14Filled} | E: {c.physical14Empty})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                    <label className="font-semibold text-gray-700">Audit Notes / Physical Counts Reconciliation*</label>
+                    <textarea
+                      required
+                      rows={4}
+                      placeholder="Enter verification notes and details here..."
+                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                      value={auditorVerificationForm.notes}
+                      onChange={e => setAuditorVerificationForm(prev => ({ ...prev, notes: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </GenericFormShell>
+            )}
+ 
+            {activeTab === 'my_entries' && (
+              <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm max-w-5xl mx-auto my-8">
+                <div className="border-b border-gray-100 pb-3 mb-4">
+                  <h3 className="text-sm font-bold text-[#02164F]">My Submissions Log</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Below are your recent refill deliveries and connection logs awaiting audit approval.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs text-left">
+                    <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                      <tr>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Customer</th>
+                        <th className="px-3 py-2">Type</th>
+                        <th className="px-3 py-2">Quantity</th>
+                        <th className="px-3 py-2">Amount Paid</th>
+                        <th className="px-3 py-2">Verification Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredDeliveries.map(del => {
+                        const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
+                        const statusColor = del.verificationStatus === 'APPROVED' 
+                          ? 'bg-green-100 text-green-700' 
+                          : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
+                        const item = del.deliveryItems?.[0] || {};
+                        return (
+                          <tr key={del.id} className="hover:bg-gray-50/50">
+                            <td className="px-3 py-2">{new Date(del.deliveryDate).toLocaleDateString()}</td>
+                            <td className="px-3 py-2 font-semibold text-gray-800">{del.customerName || cust.name}</td>
+                            <td className="px-3 py-2">{item.cylinderType === 'DOMESTIC_14_2' ? 'Domestic 14.2kg' : 'Commercial 19kg'}</td>
+                            <td className="px-3 py-2">{item.quantityDelivered || 0} Delivered / {item.emptyReturned || 0} Empty</td>
+                            <td className="px-3 py-2">₹{del.amountReceived} / ₹{del.totalAmount}</td>
+                            <td className="px-3 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${statusColor}`}>
+                                {del.verificationStatus}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredDeliveries.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="text-center text-gray-400 py-8">No submissions found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+ 
             {activeTab === 'dashboard' && (
               <div>
                 <div className="page-header mb-6">
@@ -3131,42 +3676,60 @@ export default function DashboardClient({ initialData, user }) {
                       <h3 className="text-sm font-bold text-[#02164F] mb-4">LPG Ledger Input Actions</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         <button 
-                          onClick={() => setActiveForm('domestic')}
+                          onClick={() => {
+                            setRefillForm(prev => ({
+                              ...prev,
+                              refillType: 'DOMESTIC_14_2',
+                              ratePerCylinder: settingsForm.domesticRate,
+                              amountReceived: settingsForm.domesticRate * prev.quantityDelivered,
+                              paymentMode: 'CASH'
+                            }));
+                            setActiveTab('refill');
+                          }}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-[#F37022] hover:bg-gray-50 transition text-center"
                         >
                           <Receipt className="w-6 h-6 text-[#F37022]" />
                           <span className="text-xs font-semibold text-gray-800 font-medium">Add Domestic Sale</span>
                         </button>
                         <button 
-                          onClick={() => setActiveForm('commercial')}
+                          onClick={() => {
+                            setRefillForm(prev => ({
+                              ...prev,
+                              refillType: 'COMMERCIAL_19',
+                              ratePerCylinder: settingsForm.commercialRate,
+                              amountReceived: 0,
+                              paymentMode: 'CREDIT'
+                            }));
+                            setActiveTab('refill');
+                          }}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-[#02164F] hover:bg-gray-50 transition text-center"
                         >
                           <Receipt className="w-6 h-6 text-[#02164F]" />
                           <span className="text-xs font-semibold text-gray-800 font-medium">Add Commercial Sale</span>
                         </button>
                         <button 
-                          onClick={() => setActiveForm('connection')}
+                          onClick={() => setActiveTab('connection')}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-blue-600 hover:bg-gray-50 transition text-center"
                         >
                           <UserPlus className="w-6 h-6 text-blue-600" />
                           <span className="text-xs font-semibold text-gray-800 font-medium">New Connection SBC/DBC</span>
                         </button>
                         <button 
-                          onClick={() => setActiveForm('empty_return')}
+                          onClick={() => setActiveTab('empty_return')}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-orange-500 hover:bg-gray-50 transition text-center"
                         >
                           <Truck className="w-6 h-6 text-orange-500" />
                           <span className="text-xs font-semibold text-gray-800 font-medium">Empty Return Entry</span>
                         </button>
                         <button 
-                          onClick={() => setActiveForm('payment')}
+                          onClick={() => setActiveTab('payment')}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-green-600 hover:bg-gray-50 transition text-center"
                         >
                           <DollarSign className="w-6 h-6 text-green-600" />
                           <span className="text-xs font-semibold text-gray-800 font-medium">Customer Payment</span>
                         </button>
                         <button 
-                          onClick={() => setActiveForm('incident')}
+                          onClick={() => setActiveTab('incident')}
                           className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-red-600 hover:bg-gray-50 transition text-center"
                         >
                           <AlertOctagon className="w-6 h-6 text-red-600" />
@@ -3508,117 +4071,141 @@ export default function DashboardClient({ initialData, user }) {
                       <h3 className="font-bold text-[#02164F] text-sm">1. Customer Creation Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Create verified customer profiles for domestic/commercial sales linkings.</p>
                     </div>
-                    <button onClick={() => setActiveForm('customer')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('customer')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">2. Domestic Refill Delivery Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log domestic 14.2 kg cylinder sales and empty return counts.</p>
                     </div>
-                    <button onClick={() => setActiveForm('domestic')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setRefillForm(prev => ({
+                          ...prev,
+                          refillType: 'DOMESTIC_14_2',
+                          ratePerCylinder: settingsForm.domesticRate,
+                          amountReceived: settingsForm.domesticRate * prev.quantityDelivered,
+                          paymentMode: 'CASH'
+                        }));
+                        setActiveTab('refill');
+                      }}
+                      className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1"
+                    >
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">3. Commercial Refill Delivery Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log commercial 19 kg sales, payments received, and credit rollovers.</p>
                     </div>
-                    <button onClick={() => setActiveForm('commercial')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setRefillForm(prev => ({
+                          ...prev,
+                          refillType: 'COMMERCIAL_19',
+                          ratePerCylinder: settingsForm.commercialRate,
+                          amountReceived: 0,
+                          paymentMode: 'CREDIT'
+                        }));
+                        setActiveTab('refill');
+                      }}
+                      className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1"
+                    >
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">4. New Connection Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Register new SBC/DBC cylinder connection contracts and deposits.</p>
                     </div>
-                    <button onClick={() => setActiveForm('connection')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('connection')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">5. Empty Return Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log cylinder returns from credit customers to reconcile balances.</p>
                     </div>
-                    <button onClick={() => setActiveForm('empty_return')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('empty_return')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">6. Truck Unload Entry Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log arrival of refinery trucks with filled inventory and returns.</p>
                     </div>
-                    <button onClick={() => setActiveForm('load')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('load')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">7. Daily Closing stock Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log physical EOD inventory stock count and cash in hand.</p>
                     </div>
-                    <button onClick={() => setActiveForm('closing')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('closing')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">8. Cylinder Incident damage Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log leakages, valve defects, or broken cylinders to isolate stock.</p>
                     </div>
-                    <button onClick={() => setActiveForm('incident')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('incident')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">9. Expense Entry Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Log godown expenses, truck fuel, or daily staff labor wages.</p>
                     </div>
-                    <button onClick={() => setActiveForm('expense')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('expense')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">10. Customer Payment Form</h3>
                       <p className="text-xs text-gray-500 mt-1">Record store credit and payment recoveries from commercial customers.</p>
                     </div>
-                    <button onClick={() => setActiveForm('payment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('payment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">11. Custom Invoice Creation</h3>
                       <p className="text-xs text-gray-500 mt-1">Issue wholesale bills to commercial customers directly.</p>
                     </div>
-                    <button onClick={() => setActiveForm('invoice')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('invoice')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
-
+ 
                   <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
                     <div>
                       <h3 className="font-bold text-[#02164F] text-sm">12. Direct Stock Adjustment</h3>
                       <p className="text-xs text-gray-500 mt-1">Manually adjust inventory filled/empty stocks (Admin only).</p>
                     </div>
-                    <button onClick={() => setActiveForm('stock_adjustment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('stock_adjustment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
@@ -4163,7 +4750,7 @@ export default function DashboardClient({ initialData, user }) {
             )}
 
             {/* --- TAB 5: DAILY CLOSINGS HISTORY --- */}
-            {activeTab === 'closings' && (
+            {activeTab === 'closing' && (
               <div>
                 <div className="page-header mb-6">
                   <h1 className="text-2xl font-bold text-[#02164F]">Daily Closings Inventory Audits</h1>
@@ -4485,7 +5072,8 @@ export default function DashboardClient({ initialData, user }) {
               </div>
             )}
           </div>
-        )}
+        </>
+      )}
       </main>
 
       {/* VERIFY QUEUE APPROVAL EDIT POPUP MODAL OVERLAY */}

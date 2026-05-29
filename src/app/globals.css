@@ -6,26 +6,26 @@
    ---------------------------------------------------- */
 
 :root {
-  /* Color Palette - Advisian Modern Light Style */
-  --bg-main: #F8FAFC;      /* Minimal soft grey canvas */
-  --bg-white: #FFFFFF;     /* Pure white card backgrounds */
-  --border-clean: #E8EAF0; /* Super thin grey divider */
+  /* Color Palette - Sarkari style guide */
+  --bg-main: #F8FAFC;      
+  --bg-white: #FFFFFF;     
+  --border-clean: #D7DEE8; 
   
-  --text-main: #111827;    /* Charcoal primary text */
-  --text-muted: #6B7280;   /* Cool grey descriptions */
-  --text-light: #9CA3AF;   /* Light placeholder tint */
+  --text-main: #0F172A;    
+  --text-muted: #64748B;   
+  --text-light: #94A3B8;   
 
   /* IndianOil Brand Accents & Semantics */
-  --brand-navy: #02164F;   /* IndianOil Deep Navy Blue */
-  --brand-orange: #F37022; /* IndianOil Safety Orange */
+  --brand-navy: #001F5B;   
+  --brand-orange: #F37022; 
 
-  --color-success: #16A34A; /* Emerald green - Paid/Stock OK */
-  --color-warning: #F59E0B; /* Amber - Rollovers / Warning */
-  --color-danger: #DC2626;  /* Safety Red - Mismatches / Defect */
+  --color-success: #15803D; 
+  --color-warning: #D97706; 
+  --color-danger: #DC2626;  
 
-  --transition-fast: all 0.2s ease-in-out;
-  --shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+  --transition-fast: all 0.15s ease-in-out;
+  --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 /* Custom Reset and Base Styles */
