@@ -1182,9 +1182,7 @@ export default function DashboardClient({ initialData, user }) {
       <header className="h-[80px] fixed top-0 left-0 right-0 bg-white border-b border-[#D7DEE8] px-6 flex items-center justify-between z-[100] print:hidden">
         {/* Left Side: Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#001F5B] rounded flex items-center justify-center text-white font-bold text-lg select-none">
-            IOCL
-          </div>
+          <img src="/logo.svg" className="w-10 h-10 object-contain" alt="IOCL Logo" />
           <div>
             <h1 className="text-base font-bold text-[#001F5B] leading-none uppercase tracking-wide">
               Maa Santoshi Indane Gramin Vitrak
@@ -1209,26 +1207,14 @@ export default function DashboardClient({ initialData, user }) {
           </span>
         </div>
 
-        {/* Right Side: Flag, Date, Default Rates */}
+        {/* Right Side: SAP Code & Date */}
         <div className="flex items-center gap-4 text-right">
-          <div className="hidden sm:flex flex-col text-[10px] text-gray-600 font-semibold">
-            <div>DOMESTIC 14.2kg: <span className="text-[#001F5B] font-bold font-mono">₹{settingsForm.domesticRate}</span></div>
-            <div>COMMERCIAL 19kg: <span className="text-[#001F5B] font-bold font-mono">₹{settingsForm.commercialRate}</span></div>
-          </div>
-          <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
-          <div className="flex flex-col items-end">
-            <svg className="w-6 h-4 border border-gray-200" viewBox="0 0 3 2">
-              <rect width="3" height="2" fill="#F4C2C2"/>
-              <rect width="3" height="0.66" fill="#FF9933"/>
-              <rect y="1.33" width="3" height="0.66" fill="#128807"/>
-              <rect y="0.66" width="3" height="0.67" fill="#FFFFFF"/>
-              <circle cx="1.5" cy="1" r="0.2" fill="#000080"/>
-              <circle cx="1.5" cy="1" r="0.1" fill="#FFFFFF"/>
-              <circle cx="1.5" cy="1" r="0.05" fill="#000080"/>
-            </svg>
-            <span className="text-[9px] font-mono text-gray-500 font-bold mt-1">
-              {new Date().toISOString().split('T')[0]}
-            </span>
+          <div className="flex flex-col text-xs text-gray-700 font-semibold">
+            <div>SAP CODE: <span className="text-[#001F5B] font-bold font-mono">283056</span></div>
+            <div className="flex items-center gap-1.5 justify-end mt-0.5">
+              <Calendar className="w-3.5 h-3.5 text-[#F37022]" />
+              <span>DATE: <span className="text-[#001F5B] font-bold font-mono">{new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}</span></span>
+            </div>
           </div>
         </div>
       </header>
@@ -1424,8 +1410,9 @@ export default function DashboardClient({ initialData, user }) {
       {/* MAIN CONTAINER */}
       <main className="app-content mt-[80px] pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
         {!dbData.isInitialized ? (
-          /* SYSTEM NOT INITIALIZED GATE */
-          <div className="max-w-4xl mx-auto my-8">
+          activeTab === 'dashboard' ? (
+            /* SYSTEM NOT INITIALIZED GATE */
+            <div className="max-w-4xl mx-auto my-8">
             {isAdmin || user.role === 'AUDITOR' ? (
               /* Setup Form Panel for Admin / Auditor */
               <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-md">
@@ -1581,6 +1568,24 @@ export default function DashboardClient({ initialData, user }) {
               </div>
             )}
           </div>
+          ) : (
+            /* Warning Screen for other tabs when not initialized */
+            <div className="max-w-xl mx-auto my-12 text-center p-8 bg-white border border-[#D7DEE8] rounded-xl shadow-sm">
+              <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
+              <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
+                Opening Stock Setup Required
+              </h3>
+              <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                Please complete the LPG Opening Stock initialization on the Dashboard before accessing this feature.
+              </p>
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className="mt-6 px-5 py-2.5 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          )
         ) : (
           <>
             {/* TOP STATUS BAR */}
