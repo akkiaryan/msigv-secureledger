@@ -6,6 +6,7 @@ import {
   LayoutDashboard, 
   Truck, 
   Receipt, 
+  User,
   UserPlus, 
   Lock, 
   AlertOctagon, 
