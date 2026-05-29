@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 // mail module removed
 
 // --- IAM Permission Helper ---
@@ -25,9 +26,12 @@ async function checkAuth(allowedRoles = []) {
 // --- Audit Logger Helper ---
 async function writeAudit(userId, action, tableName, recordId, oldState, newState, remarks) {
   try {
+    const session = await getServerSession(authOptions);
+    const role = session?.user?.role || null;
     await prisma.auditLog.create({
       data: {
         userId,
+        role,
         action,
         tableName,
         recordId,
@@ -73,6 +77,9 @@ export async function getDashboardData() {
     let hosePipeTransactions = [];
     let kycCardBookTransactions = [];
     let auditorVerifications = [];
+    let loadCycles = [];
+    let monthlyArchives = [];
+    let activeLoadCycle = null;
 
     if (isAdminOrManager) {
       commercialLedger = await prisma.commercialLedger.findMany({ orderBy: { createdAt: 'desc' } });
@@ -90,6 +97,9 @@ export async function getDashboardData() {
       hosePipeTransactions = await prisma.hosePipeTransaction.findMany({ include: { customer: true, staff: true }, orderBy: { txDate: 'desc' } });
       kycCardBookTransactions = await prisma.kycCardBookTransaction.findMany({ orderBy: { txDate: 'desc' } });
       auditorVerifications = await prisma.auditorVerification.findMany({ orderBy: { verificationDate: 'desc' } });
+      loadCycles = await prisma.loadCycle.findMany({ orderBy: { createdAt: 'desc' } });
+      monthlyArchives = await prisma.monthlyArchive.findMany({ orderBy: { createdAt: 'desc' } });
+      activeLoadCycle = loadCycles.find(lc => lc.status === 'active') || null;
 
       // Build unified verification queue
       const pendingDeliveries = await prisma.delivery.findMany({
@@ -223,6 +233,9 @@ export async function getDashboardData() {
         hosePipeTransactions,
         kycCardBookTransactions,
         auditorVerifications,
+        loadCycles,
+        monthlyArchives,
+        activeLoadCycle,
         kpis: {
           todayCashCollection,
           pendingCommercialAmount,
@@ -363,25 +376,54 @@ export async function submitLoad(data) {
         });
       }
 
+      // Load Cycle Lifecycle Integration
+      const inventory = await tx.inventory.findMany();
+      const domesticInv = inventory.find(i => i.cylinderType === 'DOMESTIC_14_2') || { filledStock: 0, emptyStock: 0 };
+      const commercialInv = inventory.find(i => i.cylinderType === 'COMMERCIAL_19') || { filledStock: 0, emptyStock: 0 };
+
+      // Close active cycles
+      await tx.loadCycle.updateMany({
+        where: { status: 'active' },
+        data: {
+          status: 'closed',
+          closedAt: new Date(),
+          closingBalance: `Domestic Filled: ${domesticInv.filledStock}, Empty: ${domesticInv.emptyStock}; Commercial Filled: ${commercialInv.filledStock}, Empty: ${commercialInv.emptyStock}`
+        }
+      });
+
+      // Start new cycle for the newly received load
+      await tx.loadCycle.create({
+        data: {
+          loadNumber: parsed.loadNumber,
+          loadDate: new Date(parsed.arrivalDate),
+          loadType: parsed.pattern === 'DOMESTIC_ONLY' ? 'DOMESTIC' : (parsed.pattern === 'MIXED_COMMERCIAL' ? 'MIXED' : 'COMMERCIAL'),
+          openingStock: `Domestic Filled: ${domesticInv.filledStock}, Empty: ${domesticInv.emptyStock}; Commercial Filled: ${commercialInv.filledStock}, Empty: ${commercialInv.emptyStock}`,
+          cylindersReceived: parsed.domesticFilled + parsed.commercialFilled,
+          emptyReturns: parsed.emptyReturned,
+          status: 'active'
+        }
+      });
+
       return load;
     });
 
     await writeAudit(user.id, 'INSERT', 'loads', result.id, null, { loadNumber: parsed.loadNumber }, `Load check-in logged.`);
     
     revalidatePath('/');
-    return { success: true, message: `Load ${parsed.loadNumber} successfully registered.` };
+    return { success: true, message: `Load ${parsed.loadNumber} successfully registered, active Load Cycle initiated.` };
   } catch (error) {
     console.error('submitLoad action error:', error.message);
     return { success: false, error: error.message };
   }
 }
 
-// ----------------------------------------------------
-// 3. Record Cylinder Delivery (All logged-in roles)
-// ----------------------------------------------------
 const DeliverySchema = z.object({
   deliveryDate: z.string().min(1, "Date is required"),
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(),
+  customerName: z.string().min(1, "Customer name is required"),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   employeeId: z.string().min(1, "Staff is required"),
   cylinderType: z.enum(['DOMESTIC_14_2', 'COMMERCIAL_19']),
   quantityDelivered: z.number().int().positive(),
@@ -407,18 +449,28 @@ export async function submitDelivery(data) {
     const isEmployee = user.role === 'EMPLOYEE';
     const verificationStatus = isEmployee ? 'PENDING' : 'APPROVED';
 
+    // Retrieve active load cycle if any
+    const activeLoadCycle = await prisma.loadCycle.findFirst({
+      where: { status: 'active' }
+    });
+
     const result = await prisma.$transaction(async (tx) => {
       const delivery = await tx.delivery.create({
         data: {
           deliveryDate: new Date(parsed.deliveryDate),
-          customerId: parsed.customerId,
+          customerId: parsed.customerId || null,
+          customerName: parsed.customerName,
+          consumerNumber: parsed.consumerNumber || null,
+          mobileNumber: parsed.mobileNumber || null,
+          address: parsed.address || null,
           employeeId: parsed.employeeId,
           paymentStatus,
           totalAmount,
           amountReceived: parsed.amountReceived,
           amountPending: totalAmount - parsed.amountReceived,
           remarks: `${parsed.remarks || ''} (Logged by ${user.name})`,
-          verificationStatus
+          verificationStatus,
+          loadCycleId: activeLoadCycle?.id || null
         }
       });
 
@@ -428,7 +480,7 @@ export async function submitDelivery(data) {
           cylinderType: parsed.cylinderType,
           quantityDelivered: parsed.quantityDelivered,
           emptyReturned: parsed.emptyReturned,
-          dacCode: parsed.dacCode,
+          dacCode: parsed.dacCode || null,
           dacVerified: parsed.dacVerified,
           ratePerCylinder: parsed.ratePerCylinder,
           lineTotal: totalAmount
@@ -461,7 +513,11 @@ export async function submitDelivery(data) {
           
           await tx.commercialLedger.create({
             data: {
-              customerId: parsed.customerId,
+              customerId: parsed.customerId || null,
+              customerName: parsed.customerName,
+              consumerNumber: parsed.consumerNumber || null,
+              mobileNumber: parsed.mobileNumber || null,
+              address: parsed.address || null,
               deliveryId: delivery.id,
               cylinderType: parsed.cylinderType,
               quantityDelivered: parsed.quantityDelivered,
@@ -475,12 +531,23 @@ export async function submitDelivery(data) {
             }
           });
         }
+
+        // Increment active load cycle counters
+        if (activeLoadCycle) {
+          await tx.loadCycle.update({
+            where: { id: activeLoadCycle.id },
+            data: {
+              deliveriesCompleted: { increment: parsed.quantityDelivered },
+              emptyReturns: { increment: parsed.emptyReturned }
+            }
+          });
+        }
       }
 
       return delivery;
     });
 
-    await writeAudit(user.id, 'INSERT', 'deliveries', result.id, null, { customerId: parsed.customerId }, `Delivery logged (${verificationStatus}).`);
+    await writeAudit(user.id, 'INSERT', 'deliveries', result.id, null, { customerName: parsed.customerName }, `Delivery logged (${verificationStatus}).`);
 
     revalidatePath('/');
     return { 
@@ -700,36 +767,27 @@ export async function submitConnection(data) {
     const book = parsed.lpgCardBookRequired ? 100.0 : 0.0;
     const install = 300.0;
     const stove = parsed.stoveIncluded ? 1500.0 : 0.0;
-    const gasCost = (isSingle ? 1 : 2) * 950.0;
     
     const amountPending = parsed.totalAmount - parsed.amountPaid;
     const issuedCount = isSingle ? 1 : 2;
 
     const result = await prisma.$transaction(async (tx) => {
-      // Find or create customer profile
-      let customer = (parsed.relationshipId && parsed.relationshipId.trim()) 
-        ? await tx.customer.findUnique({
-            where: { consumerNumber: parsed.relationshipId }
-          })
-        : null;
-
-      if (!customer) {
-        customer = await tx.customer.create({
-          data: {
-            name: parsed.customerName,
-            consumerNumber: (parsed.relationshipId && parsed.relationshipId.trim()) || `CONN-${Date.now().toString().slice(-6)}`,
-            mobile: parsed.mobile,
-            address: parsed.address,
-            customerType: 'domestic',
-            creditAllowed: amountPending > 0
-          }
+      // Find customer if relationshipId is linked to an existing consumer
+      let customer = null;
+      if (parsed.relationshipId && parsed.relationshipId.trim()) {
+        customer = await tx.customer.findUnique({
+          where: { consumerNumber: parsed.relationshipId }
         });
       }
 
       // Create Connection contract
       const connection = await tx.customerConnection.create({
         data: {
-          customerId: customer.id,
+          customerId: customer?.id || null,
+          customerName: parsed.customerName,
+          consumerNumber: parsed.relationshipId || null,
+          mobileNumber: parsed.mobile,
+          address: parsed.address,
           connectionType: parsed.connectionType,
           stoveIncluded: parsed.stoveIncluded,
           cylinderSecurityDeposit: cylDep,
@@ -827,7 +885,11 @@ export async function submitConnection(data) {
 // 7. Create Invoice (ADMIN / MANAGER / ACCOUNTANT)
 // ----------------------------------------------------
 const InvoiceSchema = z.object({
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(),
+  customerName: z.string().min(1, "Customer name is required"),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   cylinderType: z.string().min(1, "Cylinder description is required"),
   quantity: z.number().int().positive(),
   rate: z.number().positive(),
@@ -849,7 +911,11 @@ export async function createInvoice(data) {
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
-        customerId: parsed.customerId,
+        customerId: parsed.customerId || null,
+        customerName: parsed.customerName,
+        consumerNumber: parsed.consumerNumber || null,
+        mobileNumber: parsed.mobileNumber || null,
+        address: parsed.address || null,
         cylinderType: parsed.cylinderType,
         quantity: parsed.quantity,
         rate: parsed.rate,
@@ -1062,14 +1128,18 @@ const IncidentSchema = z.object({
   issueType: z.string().min(1, "Issue description is required"),
   quantity: z.number().int().nonnegative().default(0),
   regulatorSerialNumber: z.string().optional(),
-  hosePipeReturned: z.boolean().default(false),
-  hosePipeQuantity: z.number().int().nonnegative().default(0),
   reportedBy: z.string().optional(),
   customerId: z.string().optional(),
+  customerName: z.string().optional(),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   detectedBy: z.string().min(1, "Staff link is required"),
   location: z.string().min(1, "Location is required"),
   remarks: z.string().optional(),
-  photoUrl: z.string().optional()
+  photoUrl: z.string().optional(),
+  hosePipeReturned: z.boolean().default(false),
+  hosePipeQuantity: z.number().int().nonnegative().default(0)
 });
 
 export async function submitIncident(data) {
@@ -1100,6 +1170,10 @@ export async function submitIncident(data) {
           hosePipeQuantity: parsed.hosePipeQuantity,
           reportedBy: parsed.reportedBy || user.name,
           customerId: parsed.customerId || null,
+          customerName: parsed.customerName || null,
+          consumerNumber: parsed.consumerNumber || null,
+          mobileNumber: parsed.mobileNumber || null,
+          address: parsed.address || null,
           photoUrl: parsed.photoUrl || null
         }
       });
@@ -1133,6 +1207,10 @@ export async function submitIncident(data) {
               serialNumber: parsed.regulatorSerialNumber,
               returnDate: new Date(parsed.incidentDate),
               customerId: parsed.customerId || null,
+              customerName: parsed.customerName || null,
+              consumerNumber: parsed.consumerNumber || null,
+              mobileNumber: parsed.mobileNumber || null,
+              address: parsed.address || null,
               staffId: parsed.detectedBy,
               remarks: `Incident report regulator defect: ${parsed.issueType}`
             }
@@ -1147,6 +1225,10 @@ export async function submitIncident(data) {
               quantity: parsed.hosePipeQuantity,
               txDate: new Date(parsed.incidentDate),
               customerId: parsed.customerId || null,
+              customerName: parsed.customerName || null,
+              consumerNumber: parsed.consumerNumber || null,
+              mobileNumber: parsed.mobileNumber || null,
+              address: parsed.address || null,
               staffId: parsed.detectedBy,
               remarks: `Incident report hose pipe return: ${parsed.issueType}`
             }
@@ -1242,7 +1324,11 @@ export async function sendInvoiceReminder(id) {
 // 13. Empty returns (All roles)
 // ----------------------------------------------------
 const EmptyReturnSchema = z.object({
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(),
+  customerName: z.string().min(1, "Customer name is required"),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   quantity: z.number().int().positive(),
   cylinderType: z.enum(['DOMESTIC_14_2', 'COMMERCIAL_19']),
   returnDate: z.string().min(1, "Return date is required"),
@@ -1257,15 +1343,24 @@ export async function submitEmptyReturn(data) {
     const isEmployee = user.role === 'EMPLOYEE';
     const verificationStatus = isEmployee ? 'PENDING' : 'APPROVED';
 
+    const activeLoadCycle = await prisma.loadCycle.findFirst({
+      where: { status: 'active' }
+    });
+
     const result = await prisma.$transaction(async (tx) => {
       const entry = await tx.emptyReturn.create({
         data: {
-          customerId: parsed.customerId,
+          customerId: parsed.customerId || null,
+          customerName: parsed.customerName,
+          consumerNumber: parsed.consumerNumber || null,
+          mobileNumber: parsed.mobileNumber || null,
+          address: parsed.address || null,
           quantity: parsed.quantity,
           cylinderType: parsed.cylinderType,
           returnDate: new Date(parsed.returnDate),
           verificationStatus,
-          remarks: `${parsed.remarks || ''} (Logged by ${user.name})`
+          remarks: `${parsed.remarks || ''} (Logged by ${user.name})`,
+          loadCycleId: activeLoadCycle?.id || null
         }
       });
 
@@ -1288,7 +1383,7 @@ export async function submitEmptyReturn(data) {
           }
         });
 
-        if (parsed.cylinderType === 'COMMERCIAL_19') {
+        if (parsed.cylinderType === 'COMMERCIAL_19' && parsed.customerId) {
           const ledgers = await tx.commercialLedger.findMany({
             where: {
               customerId: parsed.customerId,
@@ -1318,6 +1413,15 @@ export async function submitEmptyReturn(data) {
             returnQty -= toClear;
           }
         }
+
+        if (activeLoadCycle) {
+          await tx.loadCycle.update({
+            where: { id: activeLoadCycle.id },
+            data: {
+              emptyReturns: { increment: parsed.quantity }
+            }
+          });
+        }
       }
 
       return entry;
@@ -1342,7 +1446,11 @@ export async function submitEmptyReturn(data) {
 // 14. Customer Payments (All roles)
 // ----------------------------------------------------
 const PaymentSchema = z.object({
-  customerId: z.string().min(1, "Customer is required"),
+  customerId: z.string().optional(),
+  customerName: z.string().min(1, "Customer name is required"),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   amount: z.number().positive(),
   paymentDate: z.string().min(1, "Payment date is required"),
   paymentMode: z.enum(['CASH', 'UPI', 'BANK_TRANSFER']),
@@ -1360,7 +1468,11 @@ export async function submitPayment(data) {
     const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
         data: {
-          customerId: parsed.customerId,
+          customerId: parsed.customerId || null,
+          customerName: parsed.customerName,
+          consumerNumber: parsed.consumerNumber || null,
+          mobileNumber: parsed.mobileNumber || null,
+          address: parsed.address || null,
           amount: parsed.amount,
           paymentDate: new Date(parsed.paymentDate),
           paymentMode: parsed.paymentMode,
@@ -1369,7 +1481,7 @@ export async function submitPayment(data) {
         }
       });
 
-      if (verificationStatus === 'APPROVED') {
+      if (verificationStatus === 'APPROVED' && parsed.customerId) {
         const ledgers = await tx.commercialLedger.findMany({
           where: {
             customerId: parsed.customerId,
@@ -1982,6 +2094,10 @@ const RegulatorReturnSchema = z.object({
   serialNumber: z.string().min(1, "Serial Number is required"),
   returnDate: z.string().min(1, "Return date is required"),
   customerId: z.string().optional(),
+  customerName: z.string().optional(),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   staffId: z.string().optional(),
   remarks: z.string().optional()
 });
@@ -1996,6 +2112,10 @@ export async function submitRegulatorReturn(data) {
         serialNumber: parsed.serialNumber,
         returnDate: new Date(parsed.returnDate),
         customerId: parsed.customerId || null,
+        customerName: parsed.customerName || null,
+        consumerNumber: parsed.consumerNumber || null,
+        mobileNumber: parsed.mobileNumber || null,
+        address: parsed.address || null,
         staffId: parsed.staffId || null,
         remarks: parsed.remarks || null
       }
@@ -2018,6 +2138,10 @@ const HosePipeTransactionSchema = z.object({
   quantity: z.number().int().positive(),
   txDate: z.string().min(1, "Date is required"),
   customerId: z.string().optional(),
+  customerName: z.string().optional(),
+  consumerNumber: z.string().optional(),
+  mobileNumber: z.string().optional(),
+  address: z.string().optional(),
   staffId: z.string().optional(),
   remarks: z.string().optional()
 });
@@ -2033,6 +2157,10 @@ export async function submitHosePipeTransaction(data) {
         quantity: parsed.quantity,
         txDate: new Date(parsed.txDate),
         customerId: parsed.customerId || null,
+        customerName: parsed.customerName || null,
+        consumerNumber: parsed.consumerNumber || null,
+        mobileNumber: parsed.mobileNumber || null,
+        address: parsed.address || null,
         staffId: parsed.staffId || null,
         remarks: parsed.remarks || null
       }
@@ -2112,6 +2240,526 @@ export async function submitAuditorVerification(data) {
     return { success: true, message: `Physical verification report saved.` };
   } catch (error) {
     console.error('submitAuditorVerification error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ----------------------------------------------------
+// 23. CSV Server-side Export (Role-Safe)
+// ----------------------------------------------------
+export async function exportCSV(reportType, filters = {}) {
+  try {
+    const user = await checkAuth([]);
+
+    // Enforce role-based visibility restrictions
+    if (user.role === 'EMPLOYEE') {
+      if (!['deliveries', 'incidents', 'connections', 'emptyReturns'].includes(reportType)) {
+        throw new Error("UNAUTHORIZED: Employees may only export log forms they have access to.");
+      }
+    } else if (user.role === 'AUDITOR') {
+      if (!['invoices', 'closings', 'commercialLedger', 'expenses', 'auditorVerifications'].includes(reportType)) {
+        throw new Error("UNAUTHORIZED: Auditor may only export ledger statements and reports.");
+      }
+    }
+
+    let records = [];
+    let headers = [];
+    let rows = [];
+
+    if (reportType === 'deliveries') {
+      const where = user.role === 'EMPLOYEE' ? { remarks: { contains: `Logged by ${user.name}` } } : {};
+      records = await prisma.delivery.findMany({
+        where,
+        include: { deliveryItems: true },
+        orderBy: { deliveryDate: 'desc' }
+      });
+      headers = ['Date', 'Customer Name', 'Consumer Number', 'Mobile', 'Address', 'Cylinder Type', 'Quantity', 'Rate', 'Total Amount', 'Amount Received', 'Payment Status', 'Verification Status', 'Remarks'];
+      rows = records.map(r => {
+        const item = r.deliveryItems?.[0] || {};
+        return [
+          new Date(r.deliveryDate).toLocaleDateString(),
+          r.customerName,
+          r.consumerNumber || '',
+          r.mobileNumber || '',
+          r.address || '',
+          item.cylinderType || '',
+          item.quantityDelivered || 0,
+          item.ratePerCylinder || 0,
+          r.totalAmount,
+          r.amountReceived,
+          r.paymentStatus,
+          r.verificationStatus,
+          r.remarks || ''
+        ];
+      });
+    } else if (reportType === 'invoices') {
+      records = await prisma.invoice.findMany({ orderBy: { invoiceDate: 'desc' } });
+      headers = ['Invoice Number', 'Date', 'Customer Name', 'Consumer Number', 'Mobile', 'Address', 'Cylinder Type', 'Quantity', 'Rate', 'Total Amount', 'Paid Amount', 'Balance', 'Status'];
+      rows = records.map(r => [
+        r.invoiceNumber,
+        new Date(r.invoiceDate).toLocaleDateString(),
+        r.customerName,
+        r.consumerNumber || '',
+        r.mobileNumber || '',
+        r.address || '',
+        r.cylinderType,
+        r.quantity,
+        r.rate,
+        r.totalAmount,
+        r.paidAmount,
+        r.balanceAmount,
+        r.paymentStatus
+      ]);
+    } else if (reportType === 'closings') {
+      records = await prisma.dailyClosing.findMany({ orderBy: { closingDate: 'desc' } });
+      headers = ['Date', 'Physical 14 Filled', 'Physical 14 Empty', 'Physical 19 Filled', 'Physical 19 Empty', 'Expected 14 Filled', 'Expected 14 Empty', 'Expected 19 Filled', 'Expected 19 Empty', 'Mismatch 14 Filled', 'Mismatch 14 Empty', 'Mismatch 19 Filled', 'Mismatch 19 Empty', 'Cash In Hand', 'Locked', 'Remarks'];
+      rows = records.map(r => [
+        new Date(r.closingDate).toLocaleDateString(),
+        r.physical14Filled,
+        r.physical14Empty,
+        r.physical19Filled,
+        r.physical19Empty,
+        r.expected14Filled,
+        r.expected14Empty,
+        r.expected19Filled,
+        r.expected19Empty,
+        r.mismatch14Filled,
+        r.mismatch14Empty,
+        r.mismatch19Filled,
+        r.mismatch19Empty,
+        r.cashInHand,
+        r.isLocked ? 'YES' : 'NO',
+        r.remarks || ''
+      ]);
+    } else if (reportType === 'commercialLedger') {
+      records = await prisma.commercialLedger.findMany({ orderBy: { createdAt: 'desc' } });
+      headers = ['Customer Name', 'Consumer Number', 'Mobile', 'Address', 'Cylinder Type', 'Delivered', 'Returned', 'Pending Empties', 'Amount Billed', 'Amount Received', 'Amount Pending', 'Due Date', 'Status'];
+      rows = records.map(r => [
+        r.customerName,
+        r.consumerNumber || '',
+        r.mobileNumber || '',
+        r.address || '',
+        r.cylinderType,
+        r.quantityDelivered,
+        r.emptyReturned,
+        r.emptyPending,
+        r.amountBilled,
+        r.amountReceived,
+        r.amountPending,
+        r.dueDate ? new Date(r.dueDate).toLocaleDateString() : '',
+        r.status
+      ]);
+    } else if (reportType === 'payments') {
+      const where = user.role === 'EMPLOYEE' ? { remarks: { contains: `Logged by ${user.name}` } } : {};
+      records = await prisma.payment.findMany({
+        where,
+        orderBy: { paymentDate: 'desc' }
+      });
+      headers = ['Date', 'Customer Name', 'Consumer Number', 'Mobile', 'Address', 'Amount', 'Payment Mode', 'Verification Status', 'Remarks'];
+      rows = records.map(r => [
+        new Date(r.paymentDate).toLocaleDateString(),
+        r.customerName,
+        r.consumerNumber || '',
+        r.mobileNumber || '',
+        r.address || '',
+        r.amount,
+        r.paymentMode,
+        r.verificationStatus,
+        r.remarks || ''
+      ]);
+    } else if (reportType === 'expenses') {
+      records = await prisma.expense.findMany({ orderBy: { expenseDate: 'desc' } });
+      headers = ['Date', 'Category', 'Amount', 'Paid To', 'Payment Mode', 'Reference ID', 'Remarks'];
+      rows = records.map(r => [
+        new Date(r.expenseDate).toLocaleDateString(),
+        r.category,
+        r.amount,
+        r.paidTo,
+        r.paymentMode,
+        r.referenceId || '',
+        r.remarks || ''
+      ]);
+    } else if (reportType === 'stockMovement') {
+      records = await prisma.inventoryTransaction.findMany({ orderBy: { transactionDate: 'desc' } });
+      headers = ['Date', 'Event Type', 'Cylinder Type', 'Filled Change', 'Empty Change', 'Damaged Change', 'Leakage Change', 'Reference ID', 'Remarks'];
+      rows = records.map(r => [
+        new Date(r.transactionDate).toLocaleDateString(),
+        r.eventType,
+        r.cylinderType,
+        r.filledChange,
+        r.emptyChange,
+        r.damagedChange,
+        r.leakageChange,
+        r.referenceId || '',
+        r.remarks || ''
+      ]);
+    } else if (reportType === 'auditorVerifications') {
+      records = await prisma.auditorVerification.findMany({ orderBy: { verificationDate: 'desc' } });
+      headers = ['Date', 'Uploaded By', 'Notes', 'Closing ID'];
+      rows = records.map(r => [
+        new Date(r.verificationDate).toLocaleDateString(),
+        r.uploadedBy,
+        r.notes || '',
+        r.closingId || ''
+      ]);
+    } else if (reportType === 'monthlyArchives') {
+      records = await prisma.monthlyArchive.findMany({ orderBy: { createdAt: 'desc' } });
+      headers = ['Month/Year', 'Opening Stock', 'Closing Stock', 'Deliveries', 'Invoices', 'Cash Received', 'Expenses', 'Commercial Pending', 'Security Mismatches', 'Created By', 'Created At'];
+      rows = records.map(r => [
+        `${r.month}/${r.year}`,
+        r.openingStock,
+        r.closingStock,
+        r.totalDeliveries,
+        r.totalInvoices,
+        r.totalCashReceived,
+        r.totalExpenses,
+        r.commercialPending,
+        r.securityMismatch,
+        r.createdBy,
+        new Date(r.createdAt).toLocaleDateString()
+      ]);
+    }
+
+    const csvContent = [
+      headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...rows.map(row => row.map(cell => {
+        const val = cell === null || cell === undefined ? '' : String(cell);
+        return `"${val.replace(/"/g, '""')}"`;
+      }).join(','))
+    ].join('\n');
+
+    await writeAudit(user.id, 'EXPORT', reportType, 'N/A', null, null, `Exported ${reportType} report as CSV.`);
+
+    return { success: true, csvData: csvContent };
+  } catch (error) {
+    console.error('exportCSV action error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ----------------------------------------------------
+// 24. PDF Server-side Export (Role-Safe via pdf-lib)
+// ----------------------------------------------------
+export async function exportPDF(reportType, filters = {}) {
+  try {
+    const user = await checkAuth([]);
+
+    // Enforce role-based visibility restrictions
+    if (user.role === 'EMPLOYEE') {
+      if (!['deliveries', 'incidents', 'connections', 'emptyReturns'].includes(reportType)) {
+        throw new Error("UNAUTHORIZED: Employees may only export logs they have logged.");
+      }
+    } else if (user.role === 'AUDITOR') {
+      if (!['invoices', 'closings', 'commercialLedger', 'expenses', 'auditorVerifications'].includes(reportType)) {
+        throw new Error("UNAUTHORIZED: Auditor may only export ledger statements and reports.");
+      }
+    }
+
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 800]);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    // Draw header
+    page.drawText('MAA SANTOSHI INDANE GRAMIN VITRAK', { x: 50, y: 750, size: 15, font: fontBold, color: rgb(0.01, 0.09, 0.31) });
+    page.drawText('IndianOil LPG Gas Distributor Operations Portal', { x: 50, y: 732, size: 9, font: font, color: rgb(0.95, 0.44, 0.13) });
+    page.drawText('------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------', { x: 50, y: 720, size: 7, font: font, color: rgb(0.8, 0.8, 0.8) });
+
+    // Draw metadata
+    page.drawText(`REPORT: ${reportType.toUpperCase()}`, { x: 50, y: 695, size: 11, font: fontBold, color: rgb(0.01, 0.09, 0.31) });
+    page.drawText(`Generated on: ${new Date().toLocaleString()}`, { x: 50, y: 678, size: 8, font: font, color: rgb(0.4, 0.4, 0.4) });
+    page.drawText(`Generated by: ${user.name} (${user.role})`, { x: 50, y: 664, size: 8, font: font, color: rgb(0.4, 0.4, 0.4) });
+
+    let records = [];
+    if (reportType === 'deliveries') {
+      const where = user.role === 'EMPLOYEE' ? { remarks: { contains: `Logged by ${user.name}` } } : {};
+      records = await prisma.delivery.findMany({ where, include: { deliveryItems: true }, orderBy: { deliveryDate: 'desc' }, take: 30 });
+    } else if (reportType === 'invoices') {
+      records = await prisma.invoice.findMany({ orderBy: { invoiceDate: 'desc' }, take: 30 });
+    } else if (reportType === 'closings') {
+      records = await prisma.dailyClosing.findMany({ orderBy: { closingDate: 'desc' }, take: 30 });
+    } else if (reportType === 'commercialLedger') {
+      records = await prisma.commercialLedger.findMany({ orderBy: { createdAt: 'desc' }, take: 30 });
+    } else if (reportType === 'payments') {
+      const where = user.role === 'EMPLOYEE' ? { remarks: { contains: `Logged by ${user.name}` } } : {};
+      records = await prisma.payment.findMany({ where, orderBy: { paymentDate: 'desc' }, take: 30 });
+    } else if (reportType === 'expenses') {
+      records = await prisma.expense.findMany({ orderBy: { expenseDate: 'desc' }, take: 30 });
+    } else if (reportType === 'stockMovement') {
+      records = await prisma.inventoryTransaction.findMany({ orderBy: { transactionDate: 'desc' }, take: 30 });
+    } else if (reportType === 'auditorVerifications') {
+      records = await prisma.auditorVerification.findMany({ orderBy: { verificationDate: 'desc' }, take: 30 });
+    } else if (reportType === 'monthlyArchives') {
+      records = await prisma.monthlyArchive.findMany({ orderBy: { createdAt: 'desc' }, take: 30 });
+    }
+
+    let yOffset = 635;
+    page.drawText('SUMMARY DATA (Last 30 entries):', { x: 50, y: yOffset, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+    yOffset -= 18;
+
+    if (records.length === 0) {
+      page.drawText('No records found.', { x: 50, y: yOffset, size: 9, font: font, color: rgb(0.5, 0.5, 0.5) });
+    } else {
+      records.forEach((r, idx) => {
+        if (yOffset < 50) return;
+        let text = '';
+        if (reportType === 'deliveries') {
+          const item = r.deliveryItems?.[0] || {};
+          text = `${idx + 1}. Date: ${new Date(r.deliveryDate).toLocaleDateString()} | Customer: ${r.customerName} | Cylinder: ${item.cylinderType || ''} | Qty: ${item.quantityDelivered || 0} | Paid: INR ${r.amountReceived} (${r.paymentStatus})`;
+        } else if (reportType === 'invoices') {
+          text = `${idx + 1}. Invoice: ${r.invoiceNumber} | Date: ${new Date(r.invoiceDate).toLocaleDateString()} | Customer: ${r.customerName} | Qty: ${r.quantity} | Total: INR ${r.totalAmount} | Status: ${r.paymentStatus}`;
+        } else if (reportType === 'closings') {
+          text = `${idx + 1}. Date: ${new Date(r.closingDate).toLocaleDateString()} | 14kg Filled/Empty: ${r.physical14Filled}/${r.physical14Empty} | 19kg Filled/Empty: ${r.physical19Filled}/${r.physical19Empty} | Cash: INR ${r.cashInHand}`;
+        } else if (reportType === 'commercialLedger') {
+          text = `${idx + 1}. Customer: ${r.customerName} | Cylinder: ${r.cylinderType} | Del/Ret: ${r.quantityDelivered}/${r.emptyReturned} | Pending Outstanding: INR ${r.amountPending}`;
+        } else if (reportType === 'payments') {
+          text = `${idx + 1}. Date: ${new Date(r.paymentDate).toLocaleDateString()} | Customer: ${r.customerName} | Amount: INR ${r.amount} | Mode: ${r.paymentMode}`;
+        } else if (reportType === 'expenses') {
+          text = `${idx + 1}. Date: ${new Date(r.expenseDate).toLocaleDateString()} | Category: ${r.category} | Amount: INR ${r.amount} | Paid To: ${r.paidTo}`;
+        } else if (reportType === 'stockMovement') {
+          text = `${idx + 1}. Date: ${new Date(r.transactionDate).toLocaleDateString()} | Event: ${r.eventType} | Type: ${r.cylinderType} | Filled: ${r.filledChange} | Empty: ${r.emptyChange}`;
+        } else if (reportType === 'auditorVerifications') {
+          text = `${idx + 1}. Date: ${new Date(r.verificationDate).toLocaleDateString()} | Uploaded By: ${r.uploadedBy} | Notes: ${r.notes || ''}`;
+        } else if (reportType === 'monthlyArchives') {
+          text = `${idx + 1}. Month: ${r.month}/${r.year} | Deliveries: ${r.totalDeliveries} | Cash: INR ${r.totalCashReceived} | Expenses: INR ${r.totalExpenses} | Created By: ${r.createdBy}`;
+        }
+
+        page.drawText(text, { x: 50, y: yOffset, size: 7.5, font: font, color: rgb(0.1, 0.1, 0.1) });
+        yOffset -= 16;
+      });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
+
+    await writeAudit(user.id, 'EXPORT', reportType, 'N/A', null, null, `Exported ${reportType} report as PDF.`);
+
+    return { success: true, pdfData: pdfBase64 };
+  } catch (error) {
+    console.error('exportPDF action error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ----------------------------------------------------
+// 25. Monthly Archives
+// ----------------------------------------------------
+export async function archiveMonth(month, year) {
+  try {
+    const user = await checkAuth(['ADMIN']);
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Fetch and aggregate operations within the selected month
+    const deliveries = await prisma.delivery.findMany({
+      where: { deliveryDate: { gte: startDate, lte: endDate } },
+      include: { deliveryItems: true }
+    });
+    const totalDeliveries = deliveries.length;
+    
+    const invoices = await prisma.invoice.findMany({
+      where: { invoiceDate: { gte: startDate, lte: endDate } }
+    });
+    const totalInvoices = invoices.length;
+
+    const payments = await prisma.payment.findMany({
+      where: { paymentDate: { gte: startDate, lte: endDate } }
+    });
+
+    const cashFromDeliveries = deliveries
+      .filter(d => d.verificationStatus === 'APPROVED')
+      .reduce((sum, d) => sum + d.amountReceived, 0);
+
+    const cashFromPayments = payments
+      .filter(p => p.verificationStatus === 'APPROVED')
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const totalCashReceived = cashFromDeliveries + cashFromPayments;
+
+    const expenses = await prisma.expense.findMany({
+      where: { expenseDate: { gte: startDate, lte: endDate } }
+    });
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const commercialLedger = await prisma.commercialLedger.findMany({
+      where: { createdAt: { gte: startDate, lte: endDate } }
+    });
+    const commercialPending = commercialLedger
+      .filter(l => l.status !== 'clear')
+      .reduce((sum, l) => sum + l.amountPending, 0);
+
+    const closings = await prisma.dailyClosing.findMany({
+      where: { closingDate: { gte: startDate, lte: endDate } }
+    });
+    const securityMismatch = closings.reduce((sum, c) => 
+      sum + Math.abs(c.mismatch14Filled) + Math.abs(c.mismatch14Empty) + Math.abs(c.mismatch19Filled) + Math.abs(c.mismatch19Empty), 0);
+
+    const firstClosing = await prisma.dailyClosing.findFirst({
+      where: { closingDate: { gte: startDate, lte: endDate } },
+      orderBy: { closingDate: 'asc' }
+    });
+    const lastClosing = await prisma.dailyClosing.findFirst({
+      where: { closingDate: { gte: startDate, lte: endDate } },
+      orderBy: { closingDate: 'desc' }
+    });
+
+    const openingStock = firstClosing 
+      ? `Domestic Filled: ${firstClosing.expected14Filled}, Empty: ${firstClosing.expected14Empty}; Commercial Filled: ${firstClosing.expected19Filled}, Empty: ${firstClosing.expected19Empty}`
+      : "N/A";
+    const closingStock = lastClosing 
+      ? `Domestic Filled: ${lastClosing.physical14Filled}, Empty: ${lastClosing.physical14Empty}; Commercial Filled: ${lastClosing.physical19Filled}, Empty: ${lastClosing.physical19Empty}`
+      : "N/A";
+
+    const archive = await prisma.monthlyArchive.create({
+      data: {
+        month: parseInt(month),
+        year: parseInt(year),
+        openingStock,
+        closingStock,
+        totalDeliveries,
+        totalInvoices,
+        totalCashReceived,
+        totalExpenses,
+        commercialPending,
+        securityMismatch,
+        pdfGenerated: true,
+        csvGenerated: true,
+        createdBy: user.name
+      }
+    });
+
+    await writeAudit(user.id, 'ARCHIVE_MONTH', 'monthly_archives', archive.id, null, archive, `Archived operations for month ${month}/${year}`);
+
+    revalidatePath('/');
+    return { success: true, message: `Month ${month}/${year} successfully archived.`, archive };
+  } catch (error) {
+    console.error('archiveMonth action error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function resetActiveMonth(archiveId) {
+  try {
+    const user = await checkAuth(['ADMIN']);
+    
+    const archive = await prisma.monthlyArchive.findUnique({ where: { id: archiveId } });
+    if (!archive) {
+      throw new Error("Archive record not found. You must archive the month first before resetting data.");
+    }
+
+    const startDate = new Date(archive.year, archive.month - 1, 1);
+    const endDate = new Date(archive.year, archive.month, 0, 23, 59, 59, 999);
+
+    await prisma.$transaction(async (tx) => {
+      // Purge detailed logs within the archived month to reclaim database space
+      await tx.deliveryItem.deleteMany({
+        where: { delivery: { deliveryDate: { gte: startDate, lte: endDate } } }
+      });
+      await tx.delivery.deleteMany({
+        where: { deliveryDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.invoice.deleteMany({
+        where: { invoiceDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.payment.deleteMany({
+        where: { paymentDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.expense.deleteMany({
+        where: { expenseDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.cylinderIncident.deleteMany({
+        where: { incidentDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.dailyClosing.deleteMany({
+        where: { closingDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.inventoryTransaction.deleteMany({
+        where: { transactionDate: { gte: startDate, lte: endDate } }
+      });
+      await tx.commercialLedger.deleteMany({
+        where: { createdAt: { gte: startDate, lte: endDate } }
+      });
+    });
+
+    await writeAudit(user.id, 'RESET_MONTH', 'monthly_archives', archiveId, null, null, `Reset operations and purged detailed logs for month ${archive.month}/${archive.year}`);
+
+    revalidatePath('/');
+    return { success: true, message: `Operational logs for month ${archive.month}/${archive.year} successfully purged from database.` };
+  } catch (error) {
+    console.error('resetActiveMonth action error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ----------------------------------------------------
+// 26. Load Cycle tracking
+// ----------------------------------------------------
+export async function startLoadCycle(data) {
+  try {
+    const user = await checkAuth(['ADMIN', 'MANAGER']);
+    
+    // Close any other active cycles
+    await prisma.loadCycle.updateMany({
+      where: { status: 'active' },
+      data: {
+        status: 'closed',
+        closedAt: new Date()
+      }
+    });
+
+    const inventory = await prisma.inventory.findMany();
+    const domesticInv = inventory.find(i => i.cylinderType === 'DOMESTIC_14_2') || { filledStock: 0, emptyStock: 0 };
+    const commercialInv = inventory.find(i => i.cylinderType === 'COMMERCIAL_19') || { filledStock: 0, emptyStock: 0 };
+
+    const loadCycle = await prisma.loadCycle.create({
+      data: {
+        loadNumber: data.loadNumber,
+        loadDate: new Date(),
+        loadType: data.loadType || 'MIXED',
+        openingStock: `Domestic Filled: ${domesticInv.filledStock}, Empty: ${domesticInv.emptyStock}; Commercial Filled: ${commercialInv.filledStock}, Empty: ${commercialInv.emptyStock}`,
+        cylindersReceived: parseInt(data.cylindersReceived) || 0,
+        status: 'active'
+      }
+    });
+
+    await writeAudit(user.id, 'START_LOAD_CYCLE', 'load_cycles', loadCycle.id, null, loadCycle, `Started Load Cycle #${data.loadNumber}`);
+    revalidatePath('/');
+    return { success: true, message: `Load Cycle #${data.loadNumber} successfully started.` };
+  } catch (error) {
+    console.error('startLoadCycle error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function closeLoadCycle(id, mismatchCount = 0) {
+  try {
+    const user = await checkAuth(['ADMIN', 'MANAGER']);
+
+    const cycle = await prisma.loadCycle.findUnique({ where: { id } });
+    if (!cycle) {
+      throw new Error("Load cycle not found.");
+    }
+
+    const inventory = await prisma.inventory.findMany();
+    const domesticInv = inventory.find(i => i.cylinderType === 'DOMESTIC_14_2') || { filledStock: 0, emptyStock: 0 };
+    const commercialInv = inventory.find(i => i.cylinderType === 'COMMERCIAL_19') || { filledStock: 0, emptyStock: 0 };
+
+    const updated = await prisma.loadCycle.update({
+      where: { id },
+      data: {
+        status: 'closed',
+        closedAt: new Date(),
+        closingBalance: `Domestic Filled: ${domesticInv.filledStock}, Empty: ${domesticInv.emptyStock}; Commercial Filled: ${commercialInv.filledStock}, Empty: ${commercialInv.emptyStock}`,
+        mismatch: parseInt(mismatchCount)
+      }
+    });
+
+    await writeAudit(user.id, 'CLOSE_LOAD_CYCLE', 'load_cycles', id, cycle, updated, `Closed Load Cycle #${cycle.loadNumber} with mismatch of ${mismatchCount}`);
+    revalidatePath('/');
+    return { success: true, message: `Load Cycle #${cycle.loadNumber} successfully closed.` };
+  } catch (error) {
+    console.error('closeLoadCycle error:', error.message);
     return { success: false, error: error.message };
   }
 }

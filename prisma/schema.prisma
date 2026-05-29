@@ -126,8 +126,12 @@ model Customer {
 // 4. SBC / DBC Connections
 model CustomerConnection {
   id                       String             @id @default(cuid())
-  customerId               String
-  customer                 Customer           @relation(fields: [customerId], references: [id])
+  customerId               String?
+  customer                 Customer?          @relation(fields: [customerId], references: [id])
+  customerName             String
+  consumerNumber           String?
+  mobileNumber             String?
+  address                  String?
   connectionType           ConnectionCategory
   stoveIncluded            Boolean            @default(false)
   cylinderSecurityDeposit  Float              @default(0.0)
@@ -220,8 +224,12 @@ model InventoryTransaction {
 model Delivery {
   id                String             @id @default(cuid())
   deliveryDate      DateTime
-  customerId        String
-  customer          Customer           @relation(fields: [customerId], references: [id])
+  customerId        String?
+  customer          Customer?          @relation(fields: [customerId], references: [id])
+  customerName      String
+  consumerNumber    String?
+  mobileNumber      String?
+  address           String?
   employeeId        String?
   employee          Employee?          @relation(fields: [employeeId], references: [id])
   paymentStatus     String             
@@ -233,6 +241,8 @@ model Delivery {
   createdAt         DateTime           @default(now())
   deliveryItems     DeliveryItem[]
   commercialLedgers CommercialLedger[]
+  loadCycleId       String?
+  loadCycle         LoadCycle?         @relation(fields: [loadCycleId], references: [id])
 
   @@map("deliveries")
 }
@@ -255,8 +265,12 @@ model DeliveryItem {
 // 8. Commercial credit and empty tracking ledger
 model CommercialLedger {
   id                String           @id @default(cuid())
-  customerId        String
-  customer          Customer         @relation(fields: [customerId], references: [id])
+  customerId        String?
+  customer          Customer?        @relation(fields: [customerId], references: [id])
+  customerName      String
+  consumerNumber    String?
+  mobileNumber      String?
+  address           String?
   deliveryId        String?
   delivery          Delivery?        @relation(fields: [deliveryId], references: [id])
   cylinderType      CylinderCategory
@@ -327,6 +341,10 @@ model CylinderIncident {
   hosePipeQuantity       Int               @default(0)
   customerId             String?
   customer               Customer?         @relation(fields: [customerId], references: [id])
+  customerName           String?
+  consumerNumber         String?
+  mobileNumber           String?
+  address                String?
   photoUrl               String?
 
   @@map("cylinder_incidents")
@@ -352,7 +370,8 @@ model AuditLog {
   id         String      @id @default(cuid())
   userId     String?
   user       User?       @relation(fields: [userId], references: [id])
-  action     AuditAction
+  role       String?
+  action     String
   tableName  String
   recordId   String
   oldState   Json?
@@ -383,8 +402,12 @@ model Invoice {
   id            String   @id @default(cuid())
   invoiceNumber String   @unique
   invoiceDate   DateTime @default(now())
-  customerId    String
-  customer      Customer @relation(fields: [customerId], references: [id])
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  customerName  String
+  consumerNumber String?
+  mobileNumber  String?
+  address       String?
   cylinderType  String
   quantity      Int
   rate          Float
@@ -400,14 +423,20 @@ model Invoice {
 // 15. Empty Cylinder Returns
 model EmptyReturn {
   id                 String   @id @default(cuid())
-  customerId         String
-  customer           Customer @relation(fields: [customerId], references: [id])
+  customerId         String?
+  customer           Customer? @relation(fields: [customerId], references: [id])
+  customerName       String
+  consumerNumber     String?
+  mobileNumber       String?
+  address            String?
   quantity           Int
   cylinderType       String   // "DOMESTIC_14_2" or "COMMERCIAL_19"
   returnDate         DateTime @default(now())
   verificationStatus String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
   remarks            String?
   createdAt          DateTime @default(now())
+  loadCycleId        String?
+  loadCycle          LoadCycle?         @relation(fields: [loadCycleId], references: [id])
 
   @@map("empty_returns")
 }
@@ -415,8 +444,12 @@ model EmptyReturn {
 // 16. Payments Received
 model Payment {
   id                 String   @id @default(cuid())
-  customerId         String
-  customer           Customer @relation(fields: [customerId], references: [id])
+  customerId         String?
+  customer           Customer? @relation(fields: [customerId], references: [id])
+  customerName       String
+  consumerNumber     String?
+  mobileNumber       String?
+  address            String?
   amount             Float
   paymentDate        DateTime @default(now())
   paymentMode        String   // "CASH", "UPI", "BANK_TRANSFER"
@@ -433,6 +466,10 @@ model RegulatorReturn {
   returnDate   DateTime  @default(now())
   customerId   String?
   customer     Customer? @relation(fields: [customerId], references: [id])
+  customerName String?
+  consumerNumber String?
+  mobileNumber String?
+  address      String?
   staffId      String?
   staff        Employee? @relation(fields: [staffId], references: [id])
   remarks      String?
@@ -448,6 +485,10 @@ model HosePipeTransaction {
   txDate     DateTime  @default(now())
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id])
+  customerName String?
+  consumerNumber String?
+  mobileNumber String?
+  address      String?
   staffId    String?
   staff      Employee? @relation(fields: [staffId], references: [id])
   remarks    String?
@@ -479,5 +520,47 @@ model AuditorVerification {
   createdAt       DateTime      @default(now())
 
   @@map("auditor_verifications")
+}
+
+model MonthlyArchive {
+  id                String   @id @default(cuid())
+  month             Int
+  year              Int
+  openingStock      String
+  closingStock      String
+  totalDeliveries   Int
+  totalInvoices     Int      @default(0)
+  totalCashReceived Float
+  totalExpenses     Float
+  commercialPending Float
+  securityMismatch  Int
+  pdfGenerated      Boolean  @default(false)
+  csvGenerated      Boolean  @default(false)
+  pdfReportUrl      String?
+  csvBackupUrl      String?
+  createdBy         String
+  createdAt         DateTime @default(now())
+
+  @@map("monthly_archives")
+}
+
+model LoadCycle {
+  id                  String               @id @default(cuid())
+  loadNumber          String
+  loadDate            DateTime
+  loadType            String               @default("DOMESTIC") // "DOMESTIC", "COMMERCIAL", "MIXED"
+  openingStock        String
+  cylindersReceived   Int
+  deliveriesCompleted Int                  @default(0)
+  emptyReturns        Int                  @default(0)
+  closingBalance      String?
+  mismatch            Int                  @default(0)
+  status              String               @default("active") // "active", "closed", "archived"
+  createdAt           DateTime             @default(now())
+  closedAt            DateTime?
+  deliveries          Delivery[]
+  emptyReturnsList    EmptyReturn[]
+
+  @@map("load_cycles")
 }
 

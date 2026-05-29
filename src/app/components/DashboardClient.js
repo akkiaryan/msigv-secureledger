@@ -30,7 +30,8 @@ import {
   ChevronRight,
   Filter,
   Package,
-  Info
+  Info,
+  Database
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as actions from '../actions';
@@ -46,6 +47,24 @@ export default function DashboardClient({ initialData, user }) {
   const [successFormPayload, setSuccessFormPayload] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [printData, setPrintData] = useState(null);
+
+  // Selected report type
+  const [selectedReportType, setSelectedReportType] = useState(
+    user.role === 'EMPLOYEE' ? 'deliveries' : (user.role === 'AUDITOR' ? 'invoices' : 'deliveries')
+  );
+
+  // Monthly Archive Form states
+  const [archiveMonthState, setArchiveMonthState] = useState(new Date().getMonth() + 1);
+  const [archiveYearState, setArchiveYearState] = useState(new Date().getFullYear());
+
+  // Load Cycle Form states
+  const [newLoadNumber, setNewLoadNumber] = useState('');
+  const [newLoadType, setNewLoadType] = useState('MIXED');
+  const [newCylindersReceived, setNewCylindersReceived] = useState(0);
+  const [closeMismatchCount, setCloseMismatchCount] = useState(0);
+  const [showCloseCycleModal, setShowCloseCycleModal] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(null);
+  const [showStartCycleModal, setShowStartCycleModal] = useState(false);
 
   // Verification Edit/Rejection States
   const [verifyingItem, setVerifyingItem] = useState(null);
@@ -95,7 +114,12 @@ export default function DashboardClient({ initialData, user }) {
 
   const [domesticForm, setDomesticForm] = useState({
     deliveryDate: new Date().toISOString().split('T')[0],
-    customerId: dbData.customers[0]?.id || '',
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     employeeId: dbData.employees[0]?.id || '',
     quantityDelivered: 1,
     emptyReturned: 1,
@@ -109,7 +133,12 @@ export default function DashboardClient({ initialData, user }) {
 
   const [commercialForm, setCommercialForm] = useState({
     deliveryDate: new Date().toISOString().split('T')[0],
-    customerId: dbData.customers[0]?.id || '',
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     employeeId: dbData.employees[0]?.id || '',
     quantityDelivered: 1,
     emptyReturned: 1,
@@ -142,7 +171,12 @@ export default function DashboardClient({ initialData, user }) {
   });
 
   const [emptyReturnForm, setEmptyReturnForm] = useState({
-    customerId: dbData.customers[0]?.id || '',
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     quantity: 1,
     cylinderType: 'DOMESTIC_14_2',
     returnDate: new Date().toISOString().split('T')[0],
@@ -188,6 +222,11 @@ export default function DashboardClient({ initialData, user }) {
     hosePipeQuantity: 0,
     reportedBy: '',
     customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     detectedBy: dbData.employees[0]?.id || '',
     location: 'godown',
     remarks: '',
@@ -204,7 +243,12 @@ export default function DashboardClient({ initialData, user }) {
   });
 
   const [paymentForm, setPaymentForm] = useState({
-    customerId: dbData.customers[0]?.id || '',
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     amount: 0,
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMode: 'CASH',
@@ -212,7 +256,12 @@ export default function DashboardClient({ initialData, user }) {
   });
 
   const [invoiceForm, setInvoiceForm] = useState({
-    customerId: dbData.customers[0]?.id || '',
+    customerId: '',
+    linkExistingCustomer: false,
+    customerName: '',
+    consumerNumber: '',
+    mobileNumber: '',
+    address: '',
     cylinderType: 'DOMESTIC_14_2',
     quantity: 1,
     rate: 950,
@@ -273,6 +322,141 @@ export default function DashboardClient({ initialData, user }) {
     return cylDep + regDep + pipe + book + install + stoveCharge + gasCost + kyc;
   };
 
+  const renderCustomerSection = (formName, formState, setFormState) => {
+    const handleCustomerSelect = (customerId) => {
+      if (!customerId) {
+        setFormState(prev => ({
+          ...prev,
+          customerId: '',
+          customerName: '',
+          consumerNumber: '',
+          mobileNumber: '',
+          address: ''
+        }));
+        return;
+      }
+      const customer = dbData.customers?.find(c => c.id === customerId);
+      if (customer) {
+        setFormState(prev => ({
+          ...prev,
+          customerId,
+          customerName: customer.name || '',
+          consumerNumber: customer.consumerNumber || '',
+          mobileNumber: customer.mobile || '',
+          address: customer.address || ''
+        }));
+      }
+    };
+
+    // Filter commercial customers only for the commercial form
+    const customerList = formName === 'commercial' 
+      ? (dbData.customers || []).filter(c => c.customerType === 'commercial')
+      : (dbData.customers || []);
+
+    return (
+      <div className="sm:col-span-2 border border-gray-100 bg-gray-50/50 rounded-xl p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Customer Details</span>
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-[#02164F]">
+            <input 
+              type="checkbox"
+              className="w-3.5 h-3.5 rounded border-gray-300 text-[#F37022] focus:ring-[#F37022]"
+              checked={formState.linkExistingCustomer}
+              onChange={e => {
+                const checked = e.target.checked;
+                setFormState(prev => ({ 
+                  ...prev, 
+                  linkExistingCustomer: checked,
+                  customerId: checked ? (customerList[0]?.id || '') : '',
+                  customerName: '',
+                  consumerNumber: '',
+                  mobileNumber: '',
+                  address: ''
+                }));
+                if (checked && customerList[0]) {
+                  handleCustomerSelect(customerList[0].id);
+                }
+              }}
+            />
+            <span>Link to Registered Customer</span>
+          </label>
+        </div>
+
+        {formState.linkExistingCustomer && (
+          <div className="flex flex-col gap-1 text-xs">
+            <div className="flex justify-between items-center mb-1">
+              <label className="font-semibold text-gray-700">Select Customer*</label>
+              {formName === 'commercial' && isAdmin && (
+                <button 
+                  type="button"
+                  onClick={() => setShowCommercialCustomerModal(true)}
+                  className="text-[10px] text-[#F37022] hover:underline font-bold"
+                >
+                  + Add New Commercial Customer
+                </button>
+              )}
+            </div>
+            <select 
+              required
+              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white w-full"
+              value={formState.customerId} 
+              onChange={e => handleCustomerSelect(e.target.value)}
+            >
+              <option value="">-- Choose Customer --</option>
+              {customerList.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1 text-xs">
+            <label className="font-semibold text-gray-700">Customer Name*</label>
+            <input 
+              type="text" 
+              required 
+              placeholder="e.g. Ramesh Kumar"
+              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white" 
+              value={formState.customerName || ''} 
+              onChange={e => setFormState(prev => ({ ...prev, customerName: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1 text-xs">
+            <label className="font-semibold text-gray-700">Consumer Number</label>
+            <input 
+              type="text" 
+              placeholder="e.g. 750012903"
+              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white" 
+              value={formState.consumerNumber || ''} 
+              onChange={e => setFormState(prev => ({ ...prev, consumerNumber: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1 text-xs">
+            <label className="font-semibold text-gray-700">Mobile Number</label>
+            <input 
+              type="text" 
+              placeholder="e.g. 9876543210"
+              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white" 
+              value={formState.mobileNumber || ''} 
+              onChange={e => setFormState(prev => ({ ...prev, mobileNumber: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1 text-xs">
+            <label className="font-semibold text-gray-700">Address</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Village Rampur"
+              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white" 
+              value={formState.address || ''} 
+              onChange={e => setFormState(prev => ({ ...prev, address: e.target.value }))}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     if (activeForm === 'connection') {
       const total = calculateConnectionPricing(connectionForm);
@@ -318,32 +502,50 @@ export default function DashboardClient({ initialData, user }) {
           return;
         }
         const payload = {
-          ...domesticForm,
+          deliveryDate: domesticForm.deliveryDate,
+          customerId: domesticForm.linkExistingCustomer ? domesticForm.customerId : null,
+          customerName: domesticForm.customerName,
+          consumerNumber: domesticForm.consumerNumber || null,
+          mobileNumber: domesticForm.mobileNumber || null,
+          address: domesticForm.address || null,
+          employeeId: domesticForm.employeeId,
           cylinderType: 'DOMESTIC_14_2',
           quantityDelivered: parseInt(domesticForm.quantityDelivered),
           emptyReturned: parseInt(domesticForm.emptyReturned),
           ratePerCylinder: parseFloat(domesticForm.ratePerCylinder),
-          amountReceived: parseFloat(domesticForm.amountReceived)
+          amountReceived: parseFloat(domesticForm.amountReceived),
+          dacCode: domesticForm.dacCode || null,
+          dacVerified: domesticForm.dacVerified,
+          remarks: domesticForm.remarks,
+          paymentMode: domesticForm.paymentMode
         };
         res = await actions.submitDelivery(payload);
         details = {
-          customer: dbData.customers.find(c => c.id === domesticForm.customerId)?.name || 'Walk-in',
+          customer: payload.customerName || 'Walk-in',
           cylinders: `${payload.quantityDelivered} x 14.2 kg`,
           amountReceived: `₹${payload.amountReceived}`,
           rate: `₹${payload.ratePerCylinder}`
         };
       } else if (formType === 'commercial') {
         const payload = {
-          ...commercialForm,
+          deliveryDate: commercialForm.deliveryDate,
+          customerId: commercialForm.linkExistingCustomer ? commercialForm.customerId : null,
+          customerName: commercialForm.customerName,
+          consumerNumber: commercialForm.consumerNumber || null,
+          mobileNumber: commercialForm.mobileNumber || null,
+          address: commercialForm.address || null,
+          employeeId: commercialForm.employeeId,
           cylinderType: 'COMMERCIAL_19',
           quantityDelivered: parseInt(commercialForm.quantityDelivered),
           emptyReturned: parseInt(commercialForm.emptyReturned),
           ratePerCylinder: parseFloat(commercialForm.ratePerCylinder),
-          amountReceived: parseFloat(commercialForm.amountReceived)
+          amountReceived: parseFloat(commercialForm.amountReceived),
+          remarks: commercialForm.remarks,
+          paymentMode: commercialForm.paymentMode
         };
         res = await actions.submitDelivery(payload);
         details = {
-          customer: dbData.customers.find(c => c.id === commercialForm.customerId)?.name || 'Direct',
+          customer: payload.customerName || 'Direct',
           cylinders: `${payload.quantityDelivered} x 19 kg`,
           amountReceived: `₹${payload.amountReceived}`,
           rate: `₹${payload.ratePerCylinder}`
@@ -365,12 +567,19 @@ export default function DashboardClient({ initialData, user }) {
         };
       } else if (formType === 'empty_return') {
         const payload = {
-          ...emptyReturnForm,
-          quantity: parseInt(emptyReturnForm.quantity)
+          customerId: emptyReturnForm.linkExistingCustomer ? emptyReturnForm.customerId : null,
+          customerName: emptyReturnForm.customerName,
+          consumerNumber: emptyReturnForm.consumerNumber || null,
+          mobileNumber: emptyReturnForm.mobileNumber || null,
+          address: emptyReturnForm.address || null,
+          quantity: parseInt(emptyReturnForm.quantity),
+          cylinderType: emptyReturnForm.cylinderType,
+          returnDate: emptyReturnForm.returnDate,
+          remarks: emptyReturnForm.remarks
         };
         res = await actions.submitEmptyReturn(payload);
         details = {
-          customer: dbData.customers.find(c => c.id === emptyReturnForm.customerId)?.name,
+          customer: payload.customerName,
           quantity: `${payload.quantity} cylinders`,
           cylinderType: payload.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg Domestic' : '19 kg Commercial'
         };
@@ -412,8 +621,23 @@ export default function DashboardClient({ initialData, user }) {
         };
       } else if (formType === 'incident') {
         const payload = {
-          ...incidentForm,
+          incidentDate: incidentForm.incidentDate,
+          incidentCategory: incidentForm.incidentCategory,
+          cylinderType: incidentForm.cylinderType,
+          issueType: incidentForm.issueType,
           quantity: parseInt(incidentForm.quantity || 0),
+          regulatorSerialNumber: incidentForm.regulatorSerialNumber || null,
+          reportedBy: incidentForm.reportedBy,
+          customerId: incidentForm.linkExistingCustomer ? incidentForm.customerId : null,
+          customerName: incidentForm.customerName || null,
+          consumerNumber: incidentForm.consumerNumber || null,
+          mobileNumber: incidentForm.mobileNumber || null,
+          address: incidentForm.address || null,
+          detectedBy: incidentForm.detectedBy,
+          location: incidentForm.location,
+          remarks: incidentForm.remarks,
+          photoUrl: incidentForm.photoUrl,
+          hosePipeReturned: incidentForm.hosePipeReturned,
           hosePipeQuantity: parseInt(incidentForm.hosePipeQuantity || 0)
         };
         res = await actions.submitIncident(payload);
@@ -436,25 +660,38 @@ export default function DashboardClient({ initialData, user }) {
         };
       } else if (formType === 'payment') {
         const payload = {
-          ...paymentForm,
-          amount: parseFloat(paymentForm.amount)
+          customerId: paymentForm.linkExistingCustomer ? paymentForm.customerId : null,
+          customerName: paymentForm.customerName,
+          consumerNumber: paymentForm.consumerNumber || null,
+          mobileNumber: paymentForm.mobileNumber || null,
+          address: paymentForm.address || null,
+          amount: parseFloat(paymentForm.amount),
+          paymentDate: paymentForm.paymentDate,
+          paymentMode: paymentForm.paymentMode,
+          remarks: paymentForm.remarks
         };
         res = await actions.submitPayment(payload);
         details = {
-          customer: dbData.customers.find(c => c.id === paymentForm.customerId)?.name,
+          customer: payload.customerName,
           amount: `₹${payload.amount}`,
           paymentMode: paymentForm.paymentMode
         };
       } else if (formType === 'invoice') {
         const payload = {
-          ...invoiceForm,
+          customerId: invoiceForm.linkExistingCustomer ? invoiceForm.customerId : null,
+          customerName: invoiceForm.customerName,
+          consumerNumber: invoiceForm.consumerNumber || null,
+          mobileNumber: invoiceForm.mobileNumber || null,
+          address: invoiceForm.address || null,
+          cylinderType: invoiceForm.cylinderType,
           quantity: parseInt(invoiceForm.quantity),
           rate: parseFloat(invoiceForm.rate),
-          paidAmount: parseFloat(invoiceForm.paidAmount)
+          paidAmount: parseFloat(invoiceForm.paidAmount),
+          paymentStatus: invoiceForm.paymentStatus
         };
         res = await actions.createInvoice(payload);
         details = {
-          customer: dbData.customers.find(c => c.id === invoiceForm.customerId)?.name,
+          customer: payload.customerName,
           amount: `₹${payload.quantity * payload.rate}`,
           status: invoiceForm.paymentStatus
         };
@@ -547,6 +784,60 @@ export default function DashboardClient({ initialData, user }) {
     }, 150);
   };
 
+  const handleCSVDownload = async (type) => {
+    setIsLoading(true);
+    try {
+      const res = await actions.exportCSV(type);
+      if (res.success && res.csvData) {
+        const blob = new Blob([res.csvData], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `msigv-${type}-${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showFeedback('success', `${type.toUpperCase()} CSV exported successfully`);
+      } else {
+        showFeedback('error', res.error || 'Failed to export CSV');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePDFDownload = async (type) => {
+    setIsLoading(true);
+    try {
+      const res = await actions.exportPDF(type);
+      if (res.success && res.pdfData) {
+        const byteCharacters = atob(res.pdfData);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `msigv-${type}-${new Date().toISOString().split('T')[0]}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showFeedback('success', `${type.toUpperCase()} PDF exported successfully`);
+      } else {
+        showFeedback('error', res.error || 'Failed to export PDF');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAuditorVerificationSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -633,6 +924,88 @@ export default function DashboardClient({ initialData, user }) {
       showFeedback('error', res.error);
     }
     setIsLoading(false);
+  };
+
+  const handleStartLoadCycle = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await actions.startLoadCycle({
+        loadNumber: newLoadNumber,
+        loadType: newLoadType,
+        cylindersReceived: parseInt(newCylindersReceived) || 0
+      });
+      if (res && res.success) {
+        showFeedback('success', res.message);
+        setNewLoadNumber('');
+        setNewLoadType('MIXED');
+        setNewCylindersReceived(0);
+        setShowStartCycleModal(false);
+        await loadData();
+      } else {
+        showFeedback('error', res?.error || 'Failed to start load cycle');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCloseLoadCycle = async () => {
+    if (!dbData.activeLoadCycle) return;
+    setIsSubmitting(true);
+    try {
+      const res = await actions.closeLoadCycle(dbData.activeLoadCycle.id, parseInt(closeMismatchCount) || 0);
+      if (res && res.success) {
+        showFeedback('success', res.message);
+        setShowCloseCycleModal(false);
+        setCloseMismatchCount(0);
+        await loadData();
+      } else {
+        showFeedback('error', res?.error || 'Failed to close load cycle');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleArchiveMonth = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await actions.archiveMonth(archiveMonthState, archiveYearState);
+      if (res && res.success) {
+        showFeedback('success', res.message);
+        await loadData();
+      } else {
+        showFeedback('error', res?.error || 'Failed to generate archive');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetActiveMonth = async (archiveId) => {
+    setIsSubmitting(true);
+    try {
+      const res = await actions.resetActiveMonth(archiveId);
+      if (res && res.success) {
+        showFeedback('success', res.message);
+        setShowArchiveConfirm(null);
+        await loadData();
+      } else {
+        showFeedback('error', res?.error || 'Failed to purge data');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Domestic Stock Threshold calculation
@@ -744,6 +1117,13 @@ export default function DashboardClient({ initialData, user }) {
               >
                 <Users className="w-4 h-4" />
                 <span>Staff Control</span>
+              </div>
+              <div 
+                className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition ${activeTab === 'data_management' ? 'bg-[#02164F]/5 text-[#02164F] font-semibold' : 'text-gray-600 hover:bg-gray-50'}`} 
+                onClick={() => { setActiveTab('data_management'); setActiveForm(null); }}
+              >
+                <Database className="w-4 h-4" />
+                <span>Data Management</span>
               </div>
             </>
           )}
@@ -944,7 +1324,7 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setDomesticForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: dbData.customers[0]?.id || '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CASH', amountReceived: 950, ratePerCylinder: 950, dacCode: '', dacVerified: false, remarks: '' }); }}
+                onReset={() => { setSuccessFormPayload(null); setDomesticForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CASH', amountReceived: 950, ratePerCylinder: 950, dacCode: '', dacVerified: false, remarks: '' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('domestic')}
               >
@@ -959,20 +1339,7 @@ export default function DashboardClient({ initialData, user }) {
                       onChange={e => setDomesticForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Customer Link*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={domesticForm.customerId} 
-                      onChange={e => setDomesticForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {dbData.customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('domestic', domesticForm, setDomesticForm)}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Delivery Staff*</label>
                     <select 
@@ -1076,7 +1443,7 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setCommercialForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: dbData.customers[0]?.id || '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CREDIT', amountReceived: 0, ratePerCylinder: 1950, remarks: '' }); }}
+                onReset={() => { setSuccessFormPayload(null); setCommercialForm({ deliveryDate: new Date().toISOString().split('T')[0], customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', employeeId: dbData.employees[0]?.id || '', quantityDelivered: 1, emptyReturned: 1, paymentMode: 'CREDIT', amountReceived: 0, ratePerCylinder: 1950, remarks: '' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('commercial')}
               >
@@ -1091,31 +1458,7 @@ export default function DashboardClient({ initialData, user }) {
                       onChange={e => setCommercialForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="font-semibold text-gray-700">Commercial Customer*</label>
-                      {isAdmin && (
-                        <button 
-                          type="button"
-                          onClick={() => setShowCommercialCustomerModal(true)}
-                          className="text-[10px] text-[#F37022] hover:underline font-bold"
-                        >
-                          + Add New Commercial Customer
-                        </button>
-                      )}
-                    </div>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={commercialForm.customerId} 
-                      onChange={e => setCommercialForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {dbData.customers.filter(c => c.customerType === 'commercial').map(c => (
-                        <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('commercial', commercialForm, setCommercialForm)}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Delivery Staff*</label>
                     <select 
@@ -1463,7 +1806,7 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setEmptyReturnForm({ customerId: dbData.customers[0]?.id || '', quantity: 1, cylinderType: 'DOMESTIC_14_2', returnDate: new Date().toISOString().split('T')[0], remarks: '' }); }}
+                onReset={() => { setSuccessFormPayload(null); setEmptyReturnForm({ customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', quantity: 1, cylinderType: 'DOMESTIC_14_2', returnDate: new Date().toISOString().split('T')[0], remarks: '' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('empty_return')}
               >
@@ -1478,20 +1821,7 @@ export default function DashboardClient({ initialData, user }) {
                       onChange={e => setEmptyReturnForm(prev => ({ ...prev, returnDate: e.target.value }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Customer Link*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={emptyReturnForm.customerId} 
-                      onChange={e => setEmptyReturnForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {dbData.customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('empty_return', emptyReturnForm, setEmptyReturnForm)}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Cylinder Type*</label>
                     <select 
@@ -1809,7 +2139,7 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setIncidentForm({ incidentDate: new Date().toISOString().split('T')[0], incidentCategory: 'Cylinder', cylinderType: 'DOMESTIC_14_2', issueType: 'Leakage', quantity: 1, regulatorSerialNumber: '', hosePipeReturned: false, hosePipeQuantity: 0, reportedBy: '', customerId: '', detectedBy: dbData.employees[0]?.id || '', location: 'godown', remarks: '', photoUrl: '' }); }}
+                onReset={() => { setSuccessFormPayload(null); setIncidentForm({ incidentDate: new Date().toISOString().split('T')[0], incidentCategory: 'Cylinder', cylinderType: 'DOMESTIC_14_2', issueType: 'Leakage', quantity: 1, regulatorSerialNumber: '', hosePipeReturned: false, hosePipeQuantity: 0, reportedBy: '', customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', detectedBy: dbData.employees[0]?.id || '', location: 'godown', remarks: '', photoUrl: '' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('incident')}
               >
@@ -1967,20 +2297,7 @@ export default function DashboardClient({ initialData, user }) {
                     </select>
                   </div>
 
-                  {/* Customer Link (Optional) */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Related Customer Link (Optional)</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={incidentForm.customerId} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- No customer linked --</option>
-                      {dbData.customers.map(cust => (
-                        <option key={cust.id} value={cust.id}>{cust.name} {cust.consumerNumber ? `(${cust.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('incident', incidentForm, setIncidentForm)}
 
                   {/* Location */}
                   <div className="flex flex-col gap-1 text-xs">
@@ -2128,7 +2445,7 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setPaymentForm({ customerId: dbData.customers[0]?.id || '', amount: 0, paymentDate: new Date().toISOString().split('T')[0], paymentMode: 'CASH', remarks: '' }); }}
+                onReset={() => { setSuccessFormPayload(null); setPaymentForm({ customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', amount: 0, paymentDate: new Date().toISOString().split('T')[0], paymentMode: 'CASH', remarks: '' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('payment')}
               >
@@ -2143,20 +2460,7 @@ export default function DashboardClient({ initialData, user }) {
                       onChange={e => setPaymentForm(prev => ({ ...prev, paymentDate: e.target.value }))}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Credit Customer*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={paymentForm.customerId} 
-                      onChange={e => setPaymentForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {dbData.customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('payment', paymentForm, setPaymentForm)}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Amount Received (INR)*</label>
                     <input 
@@ -2203,25 +2507,12 @@ export default function DashboardClient({ initialData, user }) {
                 ]}
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
-                onReset={() => { setSuccessFormPayload(null); setInvoiceForm({ customerId: dbData.customers[0]?.id || '', cylinderType: 'DOMESTIC_14_2', quantity: 1, rate: 950, paidAmount: 950, paymentStatus: 'paid' }); }}
+                onReset={() => { setSuccessFormPayload(null); setInvoiceForm({ customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', cylinderType: 'DOMESTIC_14_2', quantity: 1, rate: 950, paidAmount: 950, paymentStatus: 'paid' }); }}
                 onClose={resetActiveForm}
                 onSubmit={() => handleFormSubmit('invoice')}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Customer Link*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={invoiceForm.customerId} 
-                      onChange={e => setInvoiceForm(prev => ({ ...prev, customerId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Customer --</option>
-                      {dbData.customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} {c.consumerNumber ? `(${c.consumerNumber})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {renderCustomerSection('invoice', invoiceForm, setInvoiceForm)}
                   <div className="flex flex-col gap-1 text-xs">
                     <label className="font-semibold text-gray-700">Item Description (Cylinder Type)*</label>
                     <input 
@@ -2404,6 +2695,44 @@ export default function DashboardClient({ initialData, user }) {
                         ></div>
                       </div>
                     </div>
+
+                    {/* Active Load Cycle Banner */}
+                    {dbData.activeLoadCycle && (
+                      <div className="bg-orange-50 border border-[#F37022]/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 bg-[#F37022]/10 rounded-lg text-[#F37022]">
+                            <Database className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-[#02164F]">Active Load Cycle: #{dbData.activeLoadCycle.loadNumber}</h4>
+                              <span className="bg-[#F37022]/10 text-[#F37022] text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize">
+                                {dbData.activeLoadCycle.loadType.toLowerCase()} Load
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Started: {new Date(dbData.activeLoadCycle.loadDate).toLocaleString()} | Cylinders Received: {dbData.activeLoadCycle.cylindersReceived}
+                            </p>
+                            <div className="flex gap-4 mt-2 text-xs text-gray-600 font-medium">
+                              <span>Deliveries Completed: <strong className="text-[#02164F]">{dbData.activeLoadCycle.deliveriesCompleted || 0}</strong></span>
+                              <span>Empty Returns Logged: <strong className="text-[#02164F]">{dbData.activeLoadCycle.emptyReturns || 0}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCloseMismatchCount(0);
+                              setShowCloseCycleModal(true);
+                            }}
+                            className="w-full md:w-auto px-4 py-2 bg-[#F37022] text-white text-xs font-semibold rounded-xl hover:bg-[#F37022]/90 transition active:scale-95 shadow-sm"
+                          >
+                            Close Load Cycle
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Cylinder Stock Registry */}
                     <div className="mb-6 animate-fade-in">
@@ -3336,101 +3665,478 @@ export default function DashboardClient({ initialData, user }) {
             {/* --- TAB 4: REPORTS & AUDITS --- */}
             {activeTab === 'reports' && (
               <div>
-                <div className="page-header mb-6 flex justify-between items-center">
+                <div className="page-header mb-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
                     <h1 className="text-2xl font-bold text-[#02164F]">Reports & Security Audits</h1>
                     <p className="text-sm text-gray-500">Security audit history, employee tracking logs, and printable operational statements</p>
                   </div>
-                  <button onClick={() => window.print()} className="px-3 py-1.5 bg-[#02164F] text-white rounded text-xs font-semibold hover:bg-[#02164F]/90 print:hidden">
-                    Print Report PDF
-                  </button>
+                  <div className="flex gap-2.5 print:hidden">
+                    <button 
+                      onClick={() => handleCSVDownload(selectedReportType)}
+                      disabled={isLoading}
+                      className="px-3 py-1.5 bg-white border border-[#E8EAF0] text-[#02164F] rounded text-xs font-bold hover:bg-gray-50 transition active:scale-95 disabled:opacity-50"
+                    >
+                      Download CSV
+                    </button>
+                    <button 
+                      onClick={() => handlePDFDownload(selectedReportType)}
+                      disabled={isLoading}
+                      className="px-3 py-1.5 bg-[#F37022] text-white rounded text-xs font-bold hover:bg-[#F37022]/90 transition active:scale-95 disabled:opacity-50"
+                    >
+                      Download PDF
+                    </button>
+                    <button 
+                      onClick={() => window.print()} 
+                      className="px-3 py-1.5 bg-[#02164F] text-white rounded text-xs font-bold hover:bg-[#02164F]/90 transition active:scale-95"
+                    >
+                      Print Report
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Account Summary Cards */}
-                  <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#02164F] mb-4">Executive Accounting Statement</h3>
-                      <div className="space-y-3.5 text-xs text-gray-600">
-                        <div className="flex justify-between">
-                          <span>Total Cumulative Cash Collection:</span>
-                          <span className="font-semibold text-gray-800">₹{(dbData.deliveries || []).reduce((sum, d) => sum + d.amountReceived, 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Total Recorded Expenses:</span>
-                          <span className="font-semibold text-gray-800">₹{(dbData.expenses || []).reduce((sum, e) => sum + e.amount, 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between border-t border-gray-100 pt-3">
-                          <span className="font-bold text-gray-800">Net Operational Treasury Balance:</span>
-                          <span className="font-bold text-green-600">₹{((dbData.deliveries || []).reduce((sum, d) => sum + d.amountReceived, 0) - (dbData.expenses || []).reduce((sum, e) => sum + e.amount, 0)).toLocaleString()}</span>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Sidebar Selection */}
+                  <div className="lg:col-span-1 bg-white border border-[#E8EAF0] rounded-xl p-4 shadow-sm h-fit space-y-1 print:hidden">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2 px-2">Select Report Registry</span>
+                    {getAvailableReports().map(rep => (
+                      <button
+                        key={rep.id}
+                        type="button"
+                        onClick={() => setSelectedReportType(rep.id)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold transition ${
+                          selectedReportType === rep.id 
+                            ? 'bg-[#02164F]/5 text-[#02164F] font-bold' 
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {rep.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Report Output Viewer */}
+                  <div className="lg:col-span-3 bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm space-y-4">
+                    <div className="border-b border-gray-100 pb-3">
+                      <h3 className="text-sm font-bold text-[#02164F] capitalize">
+                        {getAvailableReports().find(r => r.id === selectedReportType)?.name || selectedReportType} Report
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Displaying active records stored in standard ledger. Click download to retrieve complete history.
+                      </p>
                     </div>
 
-                    {/* Historical Invoices */}
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#02164F] mb-4">Historical Billing Invoices</h3>
-                      <div className="table-container border-0 mt-0 max-h-[300px] overflow-y-auto">
+                    {selectedReportType === 'deliveries' && (
+                      <div className="overflow-x-auto">
                         <table className="min-w-full text-xs text-left">
-                          <thead className="bg-gray-50 border-b border-gray-100">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
                             <tr>
-                              <th className="px-3 py-2">Invoice #</th>
-                              <th className="px-3 py-2">Customer</th>
-                              <th className="px-3 py-2">Total Amount</th>
                               <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Cylinders</th>
+                              <th className="px-3 py-2">Paid</th>
                               <th className="px-3 py-2">Status</th>
+                              <th className="px-3 py-2">Verification</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
-                            {dbData.invoices?.map(inv => {
-                              const cust = dbData.customers?.find(c => c.id === inv.customerId) || { name: 'Walk-in' };
+                            {dbData.deliveries?.map(d => {
+                              const item = d.deliveryItems?.[0] || {};
                               return (
-                                <tr key={inv.id} className="hover:bg-gray-50">
-                                  <td className="px-3 py-2 font-mono font-bold text-[#02164F]">{inv.invoiceNumber}</td>
-                                  <td className="px-3 py-2 font-medium">{cust.name}</td>
-                                  <td className="px-3 py-2">₹{inv.totalAmount}</td>
-                                  <td className="px-3 py-2 text-gray-400">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
+                                <tr key={d.id} className="hover:bg-gray-50/50">
+                                  <td className="px-3 py-2">{new Date(d.deliveryDate).toLocaleDateString()}</td>
+                                  <td className="px-3 py-2 font-semibold">{d.customerName}</td>
+                                  <td className="px-3 py-2">{item.quantityDelivered || 0} x {item.cylinderType === 'DOMESTIC_14_2' ? '14.2kg' : '19kg'}</td>
+                                  <td className="px-3 py-2">₹{d.amountReceived}</td>
+                                  <td className="px-3 py-2 uppercase font-bold text-[9px]">{d.paymentStatus}</td>
                                   <td className="px-3 py-2">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                      inv.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                      d.verificationStatus === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                     }`}>
-                                      {inv.paymentStatus}
+                                      {d.verificationStatus}
                                     </span>
                                   </td>
                                 </tr>
                               );
                             })}
+                            {(!dbData.deliveries || dbData.deliveries.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No deliveries found.</td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  </div>
+                    )}
 
-                  {/* Incident Room */}
-                  <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-[#02164F] mb-4">Isolated Cylinders & Incidents</h3>
-                      <div className="space-y-3 overflow-y-auto max-h-[350px]">
-                        {dbData.incidents?.map(inc => (
-                          <div key={inc.id} className="border border-gray-50 rounded-lg p-3 bg-gray-50 text-xs">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="font-bold text-gray-800 capitalize">{inc.incidentType.replace('_', ' ')}</span>
-                              <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase ${
-                                inc.severity === 'HIGH' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {inc.severity}
-                              </span>
-                            </div>
-                            <p className="text-gray-500 font-medium">Type: {inc.cylinderType === 'DOMESTIC_14_2' ? '14.2kg Dom' : '19kg Comm'} | Qty: {inc.quantity} units</p>
-                            <p className="text-gray-400 mt-1">Location: {inc.location}</p>
-                          </div>
-                        ))}
-
-                        {(!dbData.incidents || dbData.incidents.length === 0) && (
-                          <div className="text-center text-gray-400 py-12">No incidents reported.</div>
-                        )}
+                    {selectedReportType === 'invoices' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Invoice #</th>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Total Amount</th>
+                              <th className="px-3 py-2">Paid</th>
+                              <th className="px-3 py-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.invoices?.map(inv => (
+                              <tr key={inv.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-mono font-bold text-[#02164F]">{inv.invoiceNumber}</td>
+                                <td className="px-3 py-2">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold">{inv.customerName}</td>
+                                <td className="px-3 py-2">₹{inv.totalAmount}</td>
+                                <td className="px-3 py-2">₹{inv.paidAmount}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                    inv.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {inv.paymentStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.invoices || dbData.invoices.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No invoices found.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
-                    </div>
+                    )}
+
+                    {selectedReportType === 'closings' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Physical 14kg (F/E)</th>
+                              <th className="px-3 py-2">Physical 19kg (F/E)</th>
+                              <th className="px-3 py-2">Cash In Hand</th>
+                              <th className="px-3 py-2">Mismatch 14kg (F/E)</th>
+                              <th className="px-3 py-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.dailyClosings?.map(c => (
+                              <tr key={c.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-semibold">{new Date(c.closingDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2">F: {c.physical14Filled} | E: {c.physical14Empty}</td>
+                                <td className="px-3 py-2">F: {c.physical19Filled} | E: {c.physical19Empty}</td>
+                                <td className="px-3 py-2">₹{c.cashInHand?.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-red-600 font-bold">F: {c.mismatch14Filled} | E: {c.mismatch14Empty}</td>
+                                <td className="px-3 py-2">
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-green-100 text-green-700">LOCKED</span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.dailyClosings || dbData.dailyClosings.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No daily closing audits recorded.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'commercialLedger' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Details</th>
+                              <th className="px-3 py-2">Delivered / Returned</th>
+                              <th className="px-3 py-2">Pending Empties</th>
+                              <th className="px-3 py-2">Billed / Received</th>
+                              <th className="px-3 py-2">Pending Amount</th>
+                              <th className="px-3 py-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.commercialLedger?.map(l => (
+                              <tr key={l.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-semibold">{l.customerName}</td>
+                                <td className="px-3 py-2 text-gray-500">{l.cylinderType} | {l.mobileNumber || 'N/A'}</td>
+                                <td className="px-3 py-2">{l.quantityDelivered} / {l.emptyReturned}</td>
+                                <td className="px-3 py-2 font-bold text-orange-600">{l.emptyPending}</td>
+                                <td className="px-3 py-2">₹{l.amountBilled} / ₹{l.amountReceived}</td>
+                                <td className="px-3 py-2 font-bold text-red-600">₹{l.amountPending}</td>
+                                <td className="px-3 py-2 uppercase font-bold text-[8px]">{l.status}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.commercialLedger || dbData.commercialLedger.length === 0) && (
+                              <tr>
+                                <td colSpan="7" className="text-center text-gray-400 py-8">No ledger entries found.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'payments' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Amount</th>
+                              <th className="px-3 py-2">Mode</th>
+                              <th className="px-3 py-2">Verification</th>
+                              <th className="px-3 py-2">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.payments?.map(p => (
+                              <tr key={p.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2">{new Date(p.paymentDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold">{p.customerName}</td>
+                                <td className="px-3 py-2 font-bold text-green-700">₹{p.amount}</td>
+                                <td className="px-3 py-2">{p.paymentMode}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                    p.verificationStatus === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {p.verificationStatus}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-500">{p.remarks}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.payments || dbData.payments.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No payments logged yet.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'expenses' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Category</th>
+                              <th className="px-3 py-2">Amount</th>
+                              <th className="px-3 py-2">Paid To</th>
+                              <th className="px-3 py-2">Payment Mode</th>
+                              <th className="px-3 py-2">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.expenses?.map(e => (
+                              <tr key={e.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2">{new Date(e.expenseDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold capitalize">{e.category.replace('_', ' ')}</td>
+                                <td className="px-3 py-2 font-bold text-red-600">₹{e.amount}</td>
+                                <td className="px-3 py-2">{e.paidTo}</td>
+                                <td className="px-3 py-2">{e.paymentMode}</td>
+                                <td className="px-3 py-2 text-gray-500">{e.remarks}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.expenses || dbData.expenses.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No expenses recorded yet.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'stockMovement' && (
+                      <div className="p-8 text-center text-xs space-y-3">
+                        <TrendingUp className="w-8 h-8 text-[#02164F] mx-auto animate-pulse" />
+                        <h4 className="font-bold text-gray-800">Stock Movement Audit Trail</h4>
+                        <p className="text-gray-500 max-w-md mx-auto">
+                          The stock movement database holds large sequence tables tracking direct telemetry inputs. Export to CSV or PDF to review the full registry log.
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'auditorVerifications' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Verified By</th>
+                              <th className="px-3 py-2">Notes</th>
+                              <th className="px-3 py-2">Closing ID</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.auditorVerifications?.map(v => (
+                              <tr key={v.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-semibold">{new Date(v.verificationDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2">{v.uploadedBy}</td>
+                                <td className="px-3 py-2 text-gray-500">{v.notes || 'No notes'}</td>
+                                <td className="px-3 py-2 font-mono text-[10px] text-gray-400">{v.closingId || 'None'}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.auditorVerifications || dbData.auditorVerifications.length === 0) && (
+                              <tr>
+                                <td colSpan="4" className="text-center text-gray-400 py-8">No physical verifications found.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'monthlyArchives' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Month/Year</th>
+                              <th className="px-3 py-2">Deliveries</th>
+                              <th className="px-3 py-2">Cash Collected</th>
+                              <th className="px-3 py-2">Expenses</th>
+                              <th className="px-3 py-2">Created By</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.monthlyArchives?.map(m => (
+                              <tr key={m.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 font-bold">{m.month}/{m.year}</td>
+                                <td className="px-3 py-2">{m.totalDeliveries}</td>
+                                <td className="px-3 py-2 text-green-700 font-semibold">₹{m.totalCashReceived}</td>
+                                <td className="px-3 py-2 text-red-600 font-semibold">₹{m.totalExpenses}</td>
+                                <td className="px-3 py-2">{m.createdBy}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.monthlyArchives || dbData.monthlyArchives.length === 0) && (
+                              <tr>
+                                <td colSpan="5" className="text-center text-gray-400 py-8">No monthly archives generated yet.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'incidents' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Category</th>
+                              <th className="px-3 py-2">Issue / Defect</th>
+                              <th className="px-3 py-2">Qty</th>
+                              <th className="px-3 py-2">Location</th>
+                              <th className="px-3 py-2">Reported By</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.incidents?.map(inc => (
+                              <tr key={inc.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2">{new Date(inc.incidentDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold">{inc.incidentCategory}</td>
+                                <td className="px-3 py-2">{inc.issueType}</td>
+                                <td className="px-3 py-2">{inc.quantity}</td>
+                                <td className="px-3 py-2">{inc.location}</td>
+                                <td className="px-3 py-2">{inc.reportedBy}</td>
+                              </tr>
+                            ))}
+                            {(!dbData.incidents || dbData.incidents.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No incidents reported.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'connections' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Type</th>
+                              <th className="px-3 py-2">Total Amount</th>
+                              <th className="px-3 py-2">Paid</th>
+                              <th className="px-3 py-2">Verification</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.connections?.map(c => (
+                              <tr key={c.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2">{new Date(c.connectionDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold">{c.customerName}</td>
+                                <td className="px-3 py-2 text-gray-500">{c.connectionType}</td>
+                                <td className="px-3 py-2">₹{c.totalAmount}</td>
+                                <td className="px-3 py-2">₹{c.amountPaid}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                    c.verificationStatus === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {c.verificationStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.connections || dbData.connections.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No new connections logged.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {selectedReportType === 'emptyReturns' && (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Customer</th>
+                              <th className="px-3 py-2">Cylinder Type</th>
+                              <th className="px-3 py-2">Quantity</th>
+                              <th className="px-3 py-2">Verification</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {dbData.emptyReturns?.map(r => (
+                              <tr key={r.id} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2">{new Date(r.returnDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2 font-semibold">{r.customerName}</td>
+                                <td className="px-3 py-2 text-gray-500">{r.cylinderType === 'DOMESTIC_14_2' ? '14.2kg Dom' : '19kg Comm'}</td>
+                                <td className="px-3 py-2">{r.quantity}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                    r.verificationStatus === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                  }`}>
+                                    {r.verificationStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.emptyReturns || dbData.emptyReturns.length === 0) && (
+                              <tr>
+                                <td colSpan="5" className="text-center text-gray-400 py-8">No empty returns found.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3533,6 +4239,225 @@ export default function DashboardClient({ initialData, user }) {
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                         <p className="font-bold text-[#02164F]">3. Auditor Account (AuditorSantoshi)</p>
                         <p className="mt-1">Scope: Read-only access to financial statements, payment histories, and EOD closures. Form controls hidden.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- TAB 7: DATA MANAGEMENT (ADMIN ONLY) --- */}
+            {activeTab === 'data_management' && isAdmin && (
+              <div>
+                <div className="page-header mb-6">
+                  <h1 className="text-2xl font-bold text-[#02164F]">Data Management & System Audits</h1>
+                  <p className="text-sm text-gray-500">Track and manage active load cycles, monthly archives, and ledger resets.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Load Cycle Tracking Section */}
+                  <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-sm font-bold text-[#02164F]">Load Cycle Manager</h3>
+                      {!dbData.activeLoadCycle ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowStartCycleModal(true)}
+                          className="px-3 py-1.5 bg-[#F37022] text-white text-xs font-semibold rounded-lg hover:bg-[#F37022]/90 transition active:scale-95 flex items-center gap-1.5 animate-fade-in"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Start New Cycle
+                        </button>
+                      ) : (
+                        <span className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase">
+                          Cycle Active
+                        </span>
+                      )}
+                    </div>
+
+                    {dbData.activeLoadCycle ? (
+                      <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl mb-4 text-xs">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-bold text-[#02164F] text-sm">Load Cycle #{dbData.activeLoadCycle.loadNumber}</p>
+                            <p className="text-gray-400 mt-0.5">Started: {new Date(dbData.activeLoadCycle.loadDate).toLocaleString()}</p>
+                          </div>
+                          <span className="bg-[#F37022]/10 text-[#F37022] font-bold px-2 py-0.5 rounded capitalize">
+                            {dbData.activeLoadCycle.loadType.toLowerCase()} Load
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 border-t border-b border-gray-200/50 py-3 mb-4">
+                          <div>
+                            <span className="text-gray-400 block mb-0.5">Cylinders Received</span>
+                            <strong className="text-base text-[#02164F]">{dbData.activeLoadCycle.cylindersReceived}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block mb-0.5">Deliveries Logged</span>
+                            <strong className="text-base text-[#02164F]">{dbData.activeLoadCycle.deliveriesCompleted}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block mb-0.5">Empty Returns Logged</span>
+                            <strong className="text-base text-[#02164F]">{dbData.activeLoadCycle.emptyReturns}</strong>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 block mb-0.5">Status</span>
+                            <strong className="text-base text-green-600 font-semibold capitalize">{dbData.activeLoadCycle.status}</strong>
+                          </div>
+                        </div>
+                        <div className="mb-2 text-[11px] text-gray-500">
+                          <strong>Opening Stock:</strong> <span className="font-mono">{dbData.activeLoadCycle.openingStock}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCloseMismatchCount(0);
+                            setShowCloseCycleModal(true);
+                          }}
+                          className="w-full py-2.5 bg-red-50 text-red-600 hover:bg-red-100/80 text-xs font-semibold rounded-xl transition active:scale-95 text-center mt-2 border border-red-200/40"
+                        >
+                          Close Load Cycle
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-gray-400 text-xs bg-gray-50 border border-dashed border-gray-200 rounded-xl mb-4">
+                        <Database className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p>No active load cycle. Operations are not linked to a specific delivery vehicle cycle.</p>
+                      </div>
+                    )}
+
+                    {/* Historical Load Cycles */}
+                    <div>
+                      <h4 className="text-xs font-bold text-[#02164F] uppercase tracking-wider mb-2 mt-4">Load Cycle Log History</h4>
+                      <div className="max-h-[250px] overflow-y-auto border border-[#E8EAF0] rounded-lg">
+                        <table className="min-w-full text-left text-xs text-gray-600">
+                          <thead className="bg-gray-50 text-[10px] uppercase font-bold text-[#02164F] border-b border-[#E8EAF0]">
+                            <tr>
+                              <th className="p-2.5">Load #</th>
+                              <th className="p-2.5">Type</th>
+                              <th className="p-2.5">Date</th>
+                              <th className="p-2.5 text-center">Deliv/Ret</th>
+                              <th className="p-2.5 text-center">Mismatch</th>
+                              <th className="p-2.5">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dbData.loadCycles?.map(cycle => (
+                              <tr key={cycle.id} className="hover:bg-gray-50/50">
+                                <td className="p-2.5 font-bold text-[#02164F]">#{cycle.loadNumber}</td>
+                                <td className="p-2.5 capitalize">{cycle.loadType.toLowerCase()}</td>
+                                <td className="p-2.5">{new Date(cycle.loadDate).toLocaleDateString()}</td>
+                                <td className="p-2.5 text-center font-semibold">{cycle.deliveriesCompleted} / {cycle.emptyReturns}</td>
+                                <td className="p-2.5 text-center font-bold text-red-600">{cycle.mismatch !== 0 ? cycle.mismatch : '-'}</td>
+                                <td className="p-2.5">
+                                  <span className={`px-2 py-0.5 rounded-[4px] text-[9px] font-bold uppercase ${
+                                    cycle.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                                  }`}>
+                                    {cycle.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.loadCycles || dbData.loadCycles.length === 0) && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-6">No historical cycles recorded.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Monthly Archive & Purging Section */}
+                  <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
+                    <h3 className="text-sm font-bold text-[#02164F] mb-4">Monthly Archive & Purge Manager</h3>
+                    
+                    {/* Archive form */}
+                    <form onSubmit={handleArchiveMonth} className="p-4 bg-gray-50 border border-gray-100 rounded-xl mb-4 text-xs">
+                      <h4 className="font-bold text-[#02164F] mb-3">Archive Current Month Operations</h4>
+                      <p className="text-gray-500 mb-4 text-[11px] leading-relaxed">
+                        Compiles and locks total operational counts, cash inputs, and outstanding debts. This generates a historical month summary sheet prior to triggering database purge resets.
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="flex flex-col gap-1">
+                          <label className="font-semibold text-gray-700">Month</label>
+                          <select 
+                            value={archiveMonthState}
+                            onChange={e => setArchiveMonthState(parseInt(e.target.value))}
+                            className="border border-[#E8EAF0] rounded p-2 text-xs focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
+                          >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                              <option key={m} value={m}>
+                                {new Date(2026, m - 1).toLocaleString('default', { month: 'long' })}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="font-semibold text-gray-700">Year</label>
+                          <select 
+                            value={archiveYearState}
+                            onChange={e => setArchiveYearState(parseInt(e.target.value))}
+                            className="border border-[#E8EAF0] rounded p-2 text-xs focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
+                          >
+                            {[2024, 2025, 2026, 2027, 2028].map(y => (
+                              <option key={y} value={y}>{y}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-2.5 bg-[#02164F] text-white hover:bg-[#02164F]/90 text-xs font-semibold rounded-xl transition active:scale-95 text-center flex justify-center items-center gap-1.5"
+                      >
+                        {isSubmitting ? 'Archiving...' : 'Create Monthly Archive Summary'}
+                      </button>
+                    </form>
+
+                    {/* Historical monthly archives list */}
+                    <div>
+                      <h4 className="text-xs font-bold text-[#02164F] uppercase tracking-wider mb-2">Historical Monthly Summaries</h4>
+                      <div className="max-h-[250px] overflow-y-auto border border-[#E8EAF0] rounded-lg">
+                        <table className="min-w-full text-left text-xs text-gray-600">
+                          <thead className="bg-gray-50 text-[10px] uppercase font-bold text-[#02164F] border-b border-[#E8EAF0]">
+                            <tr>
+                              <th className="p-2.5">Month/Year</th>
+                              <th className="p-2.5">Deliveries</th>
+                              <th className="p-2.5">Cash Received</th>
+                              <th className="p-2.5">Created By</th>
+                              <th className="p-2.5 text-right">Reset / Purge</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dbData.monthlyArchives?.map(archive => (
+                              <tr key={archive.id} className="hover:bg-gray-50/50">
+                                <td className="p-2.5 font-bold text-[#02164F]">
+                                  {new Date(archive.year, archive.month - 1).toLocaleString('default', { month: 'short' })} {archive.year}
+                                </td>
+                                <td className="p-2.5 font-medium">{archive.totalDeliveries}</td>
+                                <td className="p-2.5 font-medium">₹{archive.totalCashReceived?.toLocaleString()}</td>
+                                <td className="p-2.5 text-gray-400">{archive.createdBy}</td>
+                                <td className="p-2.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowArchiveConfirm(archive)}
+                                    className="px-2 py-1 bg-red-50 text-red-600 border border-red-200/40 text-[10px] font-bold rounded hover:bg-red-100 transition"
+                                  >
+                                    Reset DB
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {(!dbData.monthlyArchives || dbData.monthlyArchives.length === 0) && (
+                              <tr>
+                                <td colSpan="5" className="text-center text-gray-400 py-6">No historical archives generated.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
@@ -3804,6 +4729,156 @@ export default function DashboardClient({ initialData, user }) {
                 className="flex-1 py-2.5 bg-[#F37022] text-white rounded-xl text-xs font-semibold hover:bg-[#F37022]/90 transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
               >
                 {isSubmitting ? 'Saving...' : 'Save & Select'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* START LOAD CYCLE MODAL */}
+      {showStartCycleModal && (
+        <div className="fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-[#E8EAF0] shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-bold text-[#02164F] mb-1">Start New Load Cycle</h3>
+            <p className="text-xs text-gray-500 mb-4">Initialize tracking for a new vehicle load arrival.</p>
+
+            <form onSubmit={handleStartLoadCycle} className="space-y-3 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-gray-700">Load/Challan Number*</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. MS-L-4589"
+                  className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                  value={newLoadNumber} 
+                  onChange={e => setNewLoadNumber(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-gray-700">Load Category</label>
+                <select 
+                  className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
+                  value={newLoadType} 
+                  onChange={e => setNewLoadType(e.target.value)}
+                >
+                  <option value="MIXED">Mixed Load</option>
+                  <option value="DOMESTIC">Domestic Only</option>
+                  <option value="COMMERCIAL">Commercial Only</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-gray-700">Cylinders Received Count*</label>
+                <input 
+                  type="number" 
+                  required
+                  min="1"
+                  className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                  value={newCylindersReceived} 
+                  onChange={e => setNewCylindersReceived(parseInt(e.target.value) || 0)}
+                />
+              </div>
+
+              <div className="flex gap-2.5 mt-6 border-t border-gray-100 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowStartCycleModal(false)}
+                  className="flex-1 py-2.5 bg-white border border-[#E8EAF0] rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!newLoadNumber.trim() || isSubmitting}
+                  className="flex-1 py-2.5 bg-[#F37022] text-white rounded-xl text-xs font-semibold hover:bg-[#F37022]/90 transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {isSubmitting ? 'Starting...' : 'Start Cycle'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLOSE LOAD CYCLE WITH MISMATCH PROMPT MODAL */}
+      {showCloseCycleModal && dbData.activeLoadCycle && (
+        <div className="fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-[#E8EAF0] shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-bold text-[#02164F] mb-1">Close Active Load Cycle</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Close load tracking cycle for <strong>#{dbData.activeLoadCycle.loadNumber}</strong>. Enter any observed cylinder mismatches.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-gray-700">Observed Physical Mismatch (Cylinders)</label>
+                <input 
+                  type="number" 
+                  placeholder="e.g. -2 for shortage, 0 for clear"
+                  className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
+                  value={closeMismatchCount} 
+                  onChange={e => setCloseMismatchCount(parseInt(e.target.value) || 0)}
+                />
+                <span className="text-[10px] text-gray-400">
+                  Enter negative integers for cylinder shortages, positive for extra.
+                </span>
+              </div>
+
+              <div className="flex gap-2.5 mt-6 border-t border-gray-100 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCloseCycleModal(false)}
+                  className="flex-1 py-2.5 bg-white border border-[#E8EAF0] rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleCloseLoadCycle}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition active:scale-95 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Closing...' : 'Close & Lock'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM ARCHIVE DATA PURGE RESET MODAL */}
+      {showArchiveConfirm && (
+        <div className="fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-[#E8EAF0] shadow-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-2 text-red-600 mb-2">
+              <AlertTriangle className="w-5 h-5 animate-pulse" />
+              <h3 className="text-base font-bold text-[#02164F]">Purge Operational Logs</h3>
+            </div>
+            
+            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+              Are you absolutely sure you want to permanently delete all detailed transaction logs for the month of{' '}
+              <strong>
+                {new Date(showArchiveConfirm.year, showArchiveConfirm.month - 1).toLocaleString('default', { month: 'long' })}{' '}
+                {showArchiveConfirm.year}
+              </strong>
+              ? This action will free up database storage and cannot be undone. The aggregated monthly archive itself will be preserved.
+            </p>
+
+            <div className="flex gap-2.5 mt-6 border-t border-gray-100 pt-4">
+              <button 
+                type="button" 
+                onClick={() => setShowArchiveConfirm(null)}
+                className="flex-1 py-2.5 bg-white border border-[#E8EAF0] rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition active:scale-95"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={() => handleResetActiveMonth(showArchiveConfirm.id)}
+                disabled={isSubmitting}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition active:scale-95 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Purging...' : 'Confirm Purge'}
               </button>
             </div>
           </div>
