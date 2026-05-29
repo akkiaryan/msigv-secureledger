@@ -25,8 +25,8 @@ export default function SignInForm() {
       if (res?.error) {
         setError(res.error || 'Invalid credentials');
       } else {
-        // Reload page to let server-side session verify
-        window.location.reload();
+        // Redirect directly to the dashboard
+        window.location.href = '/';
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
