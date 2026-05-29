@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './api/auth/[...nextauth]/route';
-import SignInForm from './components/SignInForm';
+import { redirect } from 'next/navigation';
 import DashboardClient from './components/DashboardClient';
 import { getDashboardData } from './actions';
 
@@ -10,7 +10,7 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user) {
-    return <SignInForm />;
+    redirect('/sign-in');
   }
 
   // Fetch initial ledger and operation data via shared helper
