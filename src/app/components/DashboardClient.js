@@ -1008,6 +1008,29 @@ export default function DashboardClient({ initialData, user }) {
     }
   };
 
+  const getAvailableReports = () => {
+    const allReports = [
+      { id: 'deliveries', name: 'Refill Deliveries' },
+      { id: 'invoices', name: 'Commercial Invoices' },
+      { id: 'closings', name: 'Daily EOD Closings' },
+      { id: 'commercialLedger', name: 'Commercial Ledger' },
+      { id: 'expenses', name: 'Expense Statements' },
+      { id: 'connections', name: 'SBC/DBC Connections' },
+      { id: 'emptyReturns', name: 'Empty Returns Log' },
+      { id: 'incidents', name: 'Defect/Leakage Incidents' },
+      { id: 'auditorVerifications', name: 'Auditor Verifications' },
+      { id: 'monthlyArchives', name: 'Archived Month Summaries' }
+    ];
+
+    if (user.role === 'EMPLOYEE') {
+      return allReports.filter(r => ['deliveries', 'incidents', 'connections', 'emptyReturns'].includes(r.id));
+    } else if (user.role === 'AUDITOR') {
+      return allReports.filter(r => ['invoices', 'closings', 'commercialLedger', 'expenses', 'auditorVerifications'].includes(r.id));
+    }
+
+    return allReports;
+  };
+
   // Domestic Stock Threshold calculation
   const domesticFilledStock = dbData.inventory?.domestic?.filledStock || 0;
   let stockThreshold = 'Safe';
@@ -1023,14 +1046,12 @@ export default function DashboardClient({ initialData, user }) {
     stockThresholdColor = 'var(--color-warning)';
   }
 
-  // Filtered Deliveries based on Search Queries
   const filteredDeliveries = (dbData.deliveries || []).filter(del => {
-    const cust = dbData.customers?.find(c => c.id === del.customerId);
     const term = searchQuery.toLowerCase();
     if (!term) return true;
     return (
-      cust?.name.toLowerCase().includes(term) ||
-      cust?.consumerNumber?.toLowerCase().includes(term) ||
+      (del.customerName || '').toLowerCase().includes(term) ||
+      (del.consumerNumber || '').toLowerCase().includes(term) ||
       del.deliveryItems?.[0]?.dacCode?.toLowerCase().includes(term)
     );
   });
@@ -3056,7 +3077,7 @@ export default function DashboardClient({ initialData, user }) {
                               return (
                                 <tr key={del.id} className="hover:bg-gray-50/50">
                                   <td className="p-3 font-medium">{new Date(del.deliveryDate).toLocaleDateString()}</td>
-                                  <td className="p-3 font-semibold text-gray-800">{cust.name}</td>
+                                  <td className="p-3 font-semibold text-gray-800">{del.customerName || cust.name}</td>
                                   <td className="p-3">{emp.name}</td>
                                   <td className="p-3">{item.quantityDelivered} unit ({item.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'})</td>
                                   <td className="p-3 font-mono font-bold text-gray-700">{item.dacCode || 'N/A'}</td>
@@ -3167,7 +3188,7 @@ export default function DashboardClient({ initialData, user }) {
                           return (
                             <div key={del.id} className="flex justify-between items-center text-xs border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
                               <div>
-                                <p className="font-bold text-gray-800">{cust.name}</p>
+                                <p className="font-bold text-gray-800">{del.customerName || cust.name}</p>
                                 <p className="text-[10px] text-gray-400 mt-0.5">{new Date(del.deliveryDate).toLocaleDateString()}</p>
                               </div>
                               <div className="flex items-center gap-3">
@@ -3181,7 +3202,7 @@ export default function DashboardClient({ initialData, user }) {
                                   onClick={() => triggerPrintJob('invoice', {
                                     invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
                                     invoiceDate: del.deliveryDate,
-                                    customerName: cust.name,
+                                    customerName: del.customerName || cust.name,
                                     quantity: item.quantityDelivered,
                                     rate: item.ratePerCylinder,
                                     totalAmount: del.totalAmount,
@@ -3275,7 +3296,7 @@ export default function DashboardClient({ initialData, user }) {
                                   <tr key={inv.id} className="hover:bg-gray-50/50">
                                     <td className="p-3 font-mono font-bold text-[#02164F]">{inv.invoiceNumber}</td>
                                     <td className="p-3">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
-                                    <td className="p-3 font-semibold">{cust.name}</td>
+                                    <td className="p-3 font-semibold">{inv.customerName || cust.name}</td>
                                     <td className="p-3">₹{inv.totalAmount}</td>
                                     <td className="p-3">
                                       <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${inv.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -3287,7 +3308,7 @@ export default function DashboardClient({ initialData, user }) {
                                         onClick={() => triggerPrintJob('invoice', {
                                           invoiceNumber: inv.invoiceNumber,
                                           invoiceDate: inv.invoiceDate,
-                                          customerName: cust.name,
+                                          customerName: inv.customerName || cust.name,
                                           quantity: inv.quantity,
                                           rate: inv.rate,
                                           totalAmount: inv.totalAmount,
@@ -3632,10 +3653,9 @@ export default function DashboardClient({ initialData, user }) {
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-gray-800">
                       {dbData.commercialLedger?.map(ledger => {
-                        const cust = dbData.customers?.find(c => c.id === ledger.customerId) || { name: 'Direct Sale' };
                         return (
                           <tr key={ledger.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 font-semibold">{cust.name}</td>
+                            <td className="px-4 py-3 font-semibold">{ledger.customerName}</td>
                             <td className="px-4 py-3">{ledger.quantityDelivered} (19 kg)</td>
                             <td className="px-4 py-3 font-mono font-bold text-orange-600">{ledger.emptyPending} unit</td>
                             <td className="px-4 py-3">₹{ledger.amountBilled}</td>

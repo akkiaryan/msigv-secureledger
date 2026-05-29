@@ -2680,6 +2680,9 @@ export async function resetActiveMonth(archiveId) {
       await tx.commercialLedger.deleteMany({
         where: { createdAt: { gte: startDate, lte: endDate } }
       });
+    }, {
+      maxWait: 15000,
+      timeout: 60000
     });
 
     await writeAudit(user.id, 'RESET_MONTH', 'monthly_archives', archiveId, null, null, `Reset operations and purged detailed logs for month ${archive.month}/${archive.year}`);
