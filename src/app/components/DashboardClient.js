@@ -32,16 +32,221 @@ import {
   Filter,
   Package,
   Info,
-  Database
+  Database,
+  Settings,
+  X
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as actions from '../actions';
 import GenericFormShell from './GenericFormShell';
 
+function SarkariFormPage({
+  category = "EMPLOYEE OPERATIONS",
+  title,
+  subtitle,
+  instructions = [],
+  onSubmit,
+  isSubmitting,
+  successData,
+  onReset,
+  onCancel,
+  confirmTitle = "Are you sure?",
+  confirmMessage = "Please double check all fields before submitting.",
+  children
+}) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleSubmitClick = (e) => {
+    e.preventDefault();
+    setShowConfirm(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowConfirm(false);
+    onSubmit();
+  };
+
+  const triggerPrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto my-6 animate-fade-in employee-shell">
+      {/* Page Header */}
+      <div className="mb-6 border-b border-[#D6DEE8] pb-4">
+        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{category}</span>
+        <h2 className="text-xl font-bold text-[#001F5B] uppercase tracking-wide mt-0.5">{title}</h2>
+        <p className="text-xs text-gray-600 mt-1">{subtitle}</p>
+      </div>
+
+      {successData ? (
+        <div className="bg-white border border-[#D6DEE8] rounded-[4px] p-6 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 mb-4">
+            <CheckCircle className="w-8 h-8" />
+          </div>
+          <h4 className="text-xl font-bold text-gray-800 mb-2">Record Registered Successfully!</h4>
+          <p className="text-xs text-gray-500 max-w-md mx-auto mb-6">
+            {successData.message || "Your entry has been processed and logged."}
+          </p>
+
+          {/* Printable Receipt Preview Box */}
+          <div className="printable-area border border-[#D6DEE8] rounded-[4px] p-6 bg-gray-50 max-w-md mx-auto text-left shadow-none mb-6 print:border-0 print:bg-white print:p-0">
+            {/* IOCL Header style */}
+            <div className="flex items-center gap-3 border-b border-[#D6DEE8] pb-4 mb-4">
+              <img src="/logo.svg" alt="IOCL Logo" className="w-8 h-9 object-contain" />
+              <div>
+                <h5 className="font-bold text-[#001F5B] text-xs leading-tight">Maa Santoshi Indane Gramin Vitrak</h5>
+                <p className="text-[9px] text-gray-500 mt-0.5">SDMS ID: MSIGV-LPG-717 | Security Slip</p>
+              </div>
+            </div>
+
+            {/* Receipt Attributes */}
+            <div className="space-y-2 text-xs text-gray-800">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Receipt ID:</span>
+                <span className="font-mono font-semibold">{successData.id || "N/A"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Timestamp:</span>
+                <span>{new Date().toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Transaction:</span>
+                <span className="font-semibold">{title}</span>
+              </div>
+              
+              {/* Detailed custom items */}
+              {successData.details && Object.entries(successData.details).map(([key, val]) => (
+                <div key={key} className="flex justify-between border-t border-[#D6DEE8]/50 pt-1.5 mt-1.5">
+                  <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1')}:</span>
+                  <span className="font-semibold">{val}</span>
+                </div>
+              ))}
+
+              <div className="border-t border-[#D6DEE8] pt-3 mt-3 flex justify-between items-center">
+                <span className="text-gray-500 font-medium">Verification Status:</span>
+                <span className={`px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase border ${
+                  successData.status === 'PENDING' 
+                    ? 'bg-yellow-100 text-yellow-700 border-yellow-200' 
+                    : 'bg-green-100 text-green-700 border-green-200'
+                }`}>
+                  {successData.status || "APPROVED"}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-center text-[9px] text-gray-400 mt-6 border-t border-dashed border-[#D6DEE8] pt-4">
+              Thank you for choosing Indane. This is a computer generated ledger slip.
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap justify-center gap-3">
+            <button
+              onClick={triggerPrint}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#001F5B] text-white text-xs font-bold rounded-[4px] hover:bg-[#00143A] transition shadow-none"
+            >
+              <Printer className="w-3.5 h-3.5" /> Print Receipt
+            </button>
+            <button
+              onClick={onReset}
+              className="px-4 py-2 bg-white border border-[#D6DEE8] text-gray-700 text-xs font-bold rounded-[4px] hover:bg-gray-50 transition"
+            >
+              Submit Another Entry
+            </button>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 bg-white border border-[#D6DEE8] text-gray-700 text-xs font-bold rounded-[4px] hover:bg-gray-50 transition"
+              >
+                Go to Dashboard
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmitClick} className="bg-white border border-[#D6DEE8] rounded-[4px] p-6 space-y-6">
+          {/* Instructions Box */}
+          {instructions.length > 0 && (
+            <div className="bg-gray-50 rounded-[4px] border border-[#D6DEE8] p-4 flex gap-3 items-start">
+              <Info className="w-4 h-4 text-[#001F5B] shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-[10px] font-bold text-[#001F5B] uppercase tracking-wider mb-1">Operational Guidelines</h4>
+                <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
+                  {instructions.map((inst, idx) => (
+                    <li key={idx}>{inst}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Form Content Fields */}
+          <div className="space-y-6">
+            {children}
+          </div>
+
+          {/* Actions Bar */}
+          <div className="border-t border-[#D6DEE8] pt-4 mt-6 flex justify-end gap-3 bg-white">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 bg-white border border-[#D6DEE8] text-gray-700 text-xs font-bold rounded-[4px] hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded-[4px] transition disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {isSubmitting ? "Processing..." : "Verify & Submit"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Double Confirmation Modal Overlay */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-[#001F5B]/30 backdrop-blur-sm flex items-center justify-center z-[999] p-4 animate-fade-in">
+          <div className="bg-white rounded-[4px] border border-[#D6DEE8] p-6 max-w-sm w-full text-center">
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-yellow-50 text-yellow-600 mb-4 border border-yellow-100">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h4 className="text-base font-bold text-gray-800 mb-1">{confirmTitle}</h4>
+            <p className="text-xs text-gray-500 mb-6">{confirmMessage}</p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-2 bg-white border border-[#D6DEE8] text-xs font-bold text-gray-700 rounded-[4px] hover:bg-gray-50 transition"
+              >
+                Back to Edit
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSubmit}
+                className="flex-1 py-2 bg-[#F37022] text-xs font-bold text-white rounded-[4px] hover:bg-[#D9540C] transition shadow-none"
+              >
+                Yes, Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardClient({ initialData, user }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeForm, setActiveForm] = useState(null);
   const [dbData, setDbData] = useState(initialData);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +269,8 @@ export default function DashboardClient({ initialData, user }) {
     regulators: 0,
     hosePipes: 0,
     openingCash: 0,
-    remarks: ''
+    remarks: '',
+    loadReference: ''
   });
 
   const [refillForm, setRefillForm] = useState({
@@ -325,6 +531,18 @@ export default function DashboardClient({ initialData, user }) {
     closingId: ''
   });
 
+  const [auditorClosingForm, setAuditorClosingForm] = useState({
+    verificationDate: new Date().toISOString().split('T')[0],
+    physical14Filled: 0,
+    physical14Empty: 0,
+    physical19Filled: 0,
+    physical19Empty: 0,
+    physicalCash: 0,
+    mismatchReason: '',
+    imageUrl: '',
+    closingId: ''
+  });
+
   const [showCommercialCustomerModal, setShowCommercialCustomerModal] = useState(false);
   const [newCommercialCustomer, setNewCommercialCustomer] = useState({
     name: '',
@@ -529,6 +747,7 @@ export default function DashboardClient({ initialData, user }) {
 
     try {
       if (formType === 'opening_stock') {
+        const fullRemarks = openingStockForm.remarks + (openingStockForm.loadReference ? ` [Load Ref: ${openingStockForm.loadReference}]` : '');
         const payload = {
           date: openingStockForm.date,
           filled14: parseInt(openingStockForm.filled14),
@@ -538,7 +757,7 @@ export default function DashboardClient({ initialData, user }) {
           regulators: parseInt(openingStockForm.regulators || 0),
           hosePipes: parseInt(openingStockForm.hosePipes || 0),
           openingCash: parseFloat(openingStockForm.openingCash || 0),
-          remarks: openingStockForm.remarks
+          remarks: fullRemarks
         };
         res = await actions.initializeOpeningStock(payload);
         details = {
@@ -959,6 +1178,67 @@ export default function DashboardClient({ initialData, user }) {
     }
   };
 
+  const handleAuditorClosingSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const expected14F = dbData.inventory?.domestic?.filledStock || 0;
+      const expected14E = dbData.inventory?.domestic?.emptyStock || 0;
+      const expected19F = dbData.inventory?.commercial?.filledStock || 0;
+      const expected19E = dbData.inventory?.commercial?.emptyStock || 0;
+      const expectedCash = (dbData.kpis?.todayCashCollection || 0) - (dbData.kpis?.staffPaymentsToday || 0);
+
+      const m14F = auditorClosingForm.physical14Filled - expected14F;
+      const m14E = auditorClosingForm.physical14Empty - expected14E;
+      const m19F = auditorClosingForm.physical19Filled - expected19F;
+      const m19E = auditorClosingForm.physical19Empty - expected19E;
+      const mCash = auditorClosingForm.physicalCash - expectedCash;
+
+      const formattedNotes = `DAILY CLOSING PHYSICAL VERIFICATION:
+Expected 14.2kg Filled: ${expected14F} | Physical: ${auditorClosingForm.physical14Filled} | Mismatch: ${m14F >= 0 ? '+' : ''}${m14F}
+Expected 14.2kg Empty: ${expected14E} | Physical: ${auditorClosingForm.physical14Empty} | Mismatch: ${m14E >= 0 ? '+' : ''}${m14E}
+Expected 19kg Filled: ${expected19F} | Physical: ${auditorClosingForm.physical19Filled} | Mismatch: ${m19F >= 0 ? '+' : ''}${m19F}
+Expected 19kg Empty: ${expected19E} | Physical: ${auditorClosingForm.physical19Empty} | Mismatch: ${m19E >= 0 ? '+' : ''}${m19E}
+Expected Cash: ₹${expectedCash} | Physical Counted: ₹${auditorClosingForm.physicalCash} | Mismatch: ${mCash >= 0 ? '+' : ''}₹${mCash}
+Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
+
+      // Auto-match closing record by date
+      const matchedClosing = dbData.dailyClosings?.find(
+        c => new Date(c.closingDate).toDateString() === new Date(auditorClosingForm.verificationDate).toDateString()
+      );
+
+      const payload = {
+        verificationDate: auditorClosingForm.verificationDate,
+        imageUrl: auditorClosingForm.imageUrl || null,
+        notes: formattedNotes,
+        closingId: matchedClosing ? matchedClosing.id : null
+      };
+
+      const res = await actions.submitAuditorVerification(payload);
+      if (res && res.success) {
+        showFeedback('success', 'Daily Closing Verification Submitted Successfully.');
+        setAuditorClosingForm({
+          verificationDate: new Date().toISOString().split('T')[0],
+          physical14Filled: 0,
+          physical14Empty: 0,
+          physical19Filled: 0,
+          physical19Empty: 0,
+          physicalCash: 0,
+          mismatchReason: '',
+          imageUrl: '',
+          closingId: ''
+        });
+        await loadData();
+      } else {
+        showFeedback('error', res?.error || 'Failed to submit verification');
+      }
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Verification Approvals
   const handleApproveEntry = async (item) => {
     // Show edit overlay for approval
@@ -1153,8 +1433,119 @@ export default function DashboardClient({ initialData, user }) {
     );
   });
 
+  const isTabAllowedWhenNotInitialized = (tab) => {
+    if (isAdmin || isAuditor) return tab === 'dashboard';
+    if (isEmployee) return ['dashboard', 'incident', 'my_entries'].includes(tab);
+    return false;
+  };
+
+  const getMismatchLabel = (physical, expected) => {
+    const delta = physical - expected;
+    if (delta > 0) return `+${delta} Extra`;
+    if (delta < 0) return `${delta} Missing`;
+    return `0 Matched`;
+  };
+
+  const getMismatchClass = (physical, expected) => {
+    const delta = physical - expected;
+    if (delta > 0) return 'text-blue-600 font-bold';
+    if (delta < 0) return 'text-red-600 font-bold';
+    return 'text-green-600 font-medium';
+  };
+
+  const getTodayStart = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  const refillTodayCount = dbData.deliveries?.filter(
+    d => new Date(d.deliveryDate) >= getTodayStart() && d.verificationStatus === 'APPROVED'
+  ).length || 0;
+
+  const connectionsTodayCount = dbData.connections?.filter(
+    c => new Date(c.connectionDate) >= getTodayStart() && c.verificationStatus === 'APPROVED'
+  ).length || 0;
+
+  const incidentsTodayCount = dbData.incidents?.filter(
+    i => new Date(i.incidentDate) >= getTodayStart()
+  ).length || 0;
+
+  const totalCollectionToday = dbData.kpis?.todayCashCollection || 0;
+
+  const employeeRefillsToday = dbData.deliveries?.filter(
+    d => new Date(d.deliveryDate) >= getTodayStart()
+  ).length || 0;
+
+  const employeeConnectionsToday = dbData.connections?.filter(
+    c => new Date(c.connectionDate) >= getTodayStart()
+  ).length || 0;
+
+  const employeeIncidentsToday = dbData.incidents?.filter(
+    i => new Date(i.incidentDate) >= getTodayStart()
+  ).length || 0;
+
+  const recentActivities = [
+    ...(dbData.deliveries || []).map(d => ({
+      id: d.id,
+      date: d.deliveryDate,
+      type: 'Refill Entry',
+      consumer: d.customerName || d.customer?.name || 'Walk-in',
+      status: d.verificationStatus,
+      rawDate: new Date(d.deliveryDate)
+    })),
+    ...(dbData.connections || []).map(c => ({
+      id: c.id,
+      date: c.connectionDate,
+      type: 'New Connection',
+      consumer: c.customerName || c.customer?.name || 'N/A',
+      status: c.verificationStatus,
+      rawDate: new Date(c.connectionDate)
+    })),
+    ...(dbData.incidents || []).map(i => ({
+      id: i.id,
+      date: i.incidentDate,
+      type: 'Incident Report',
+      consumer: i.customerName || 'N/A',
+      status: i.verificationStatus,
+      rawDate: new Date(i.incidentDate)
+    }))
+  ].sort((a, b) => b.rawDate - a.rawDate);
+
+  const latestClosing = dbData.dailyClosings?.[0];
+  const hasMismatch = latestClosing && (
+    latestClosing.mismatch14Filled !== 0 || 
+    latestClosing.mismatch14Empty !== 0 || 
+    latestClosing.mismatch19Filled !== 0 || 
+    latestClosing.mismatch19Empty !== 0
+  );
+
+  const bottomNavLinks = isEmployee
+    ? [
+        { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiresInit: false },
+        { tab: 'refill', label: 'Refill', icon: RefreshCw, requiresInit: true },
+        { tab: 'connection', label: 'Connection', icon: UserPlus, requiresInit: true },
+        { tab: 'incident', label: 'Incident', icon: AlertOctagon, requiresInit: false },
+        { tab: 'more', label: 'More', icon: Plus, requiresInit: false }
+      ]
+    : isAuditor
+      ? [
+          { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiresInit: false },
+          { tab: 'closing', label: 'Verify', icon: ClipboardCheck, requiresInit: true },
+          { tab: 'commercial', label: 'Ledger', icon: Receipt, requiresInit: true },
+          { tab: 'reports', label: 'Reports', icon: FileText, requiresInit: true },
+          { tab: 'more', label: 'More', icon: Plus, requiresInit: false }
+        ]
+      : [
+          { tab: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiresInit: false },
+          { tab: 'refill', label: 'Refill', icon: RefreshCw, requiresInit: true },
+          { tab: 'connection', label: 'Connection', icon: UserPlus, requiresInit: true },
+          { tab: 'commercial', label: 'Ledger', icon: Receipt, requiresInit: true },
+          { tab: 'more', label: 'More', icon: Plus, requiresInit: false }
+        ];
+
   return (
-    <div className="app-container">
+    <div className="msigv-app">
       {/* Toast Alert */}
       {feedback && (
         <div style={{
@@ -1178,10 +1569,10 @@ export default function DashboardClient({ initialData, user }) {
         </div>
       )}
 
-      {/* Global 80px Top Header */}
-      <header className="h-[80px] fixed top-0 left-0 right-0 bg-white border-b border-[#D7DEE8] flex items-center z-[100] print:hidden">
-        {/* Left Brand Area (spans the sidebar width of 260px) */}
-        <div className="w-[260px] h-full flex items-center gap-3 px-6 border-r border-[#D7DEE8] shrink-0">
+      {/* LEFT SIDEBAR NAVIGATION */}
+      <aside className="msigv-sidebar print:hidden">
+        {/* Logo block */}
+        <div className="sidebar-brand">
           <img src="/logo.svg" className="w-9 h-9 object-contain" alt="IOCL Logo" />
           <div>
             <h2 className="font-bold text-[#001F5B] text-xs leading-tight">Maa Santoshi Indane</h2>
@@ -1189,47 +1580,11 @@ export default function DashboardClient({ initialData, user }) {
           </div>
         </div>
 
-        {/* Right Main Header Area (spans the content area, aligned with app-content) */}
-        <div className="flex-1 h-full max-w-[1280px] mr-auto px-8 flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-[#001F5B] uppercase tracking-wider">
-              LPG SecureLedger Portal
-            </span>
-          </div>
-
-          {/* Center: User Info & Status */}
-          <div className="hidden md:flex flex-col items-center text-center">
-            <div className="flex items-center gap-2 bg-[#001F5B]/5 px-3 py-1 rounded border border-[#001F5B]/10">
-              <User className="w-3.5 h-3.5 text-[#001F5B]" />
-              <span className="text-xs font-bold text-[#001F5B] uppercase tracking-wider">
-                {user.name} ({user.role})
-              </span>
-            </div>
-            <span className="text-[10px] text-green-600 font-bold uppercase tracking-widest mt-1 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-ping"></span>
-              System Online & Secure
-            </span>
-          </div>
-
-          {/* Right Side: SAP Code & Date */}
-          <div className="flex items-center gap-4 text-right">
-            <div className="flex flex-col text-xs text-gray-700 font-semibold">
-              <div>SAP CODE: <span className="text-[#001F5B] font-bold font-mono">283056</span></div>
-              <div className="flex items-center gap-1.5 justify-end mt-0.5">
-                <Calendar className="w-3.5 h-3.5 text-[#F37022]" />
-                <span>DATE: <span className="text-[#001F5B] font-bold font-mono">{new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}</span></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="app-sidebar print:hidden" style={{ top: '80px', height: 'calc(100vh - 80px)' }}>
-        <nav className="sidebar-nav flex-1 space-y-1 overflow-y-auto">
+        {/* Navigation menu */}
+        <nav className="sidebar-nav">
           {/* Main Dashboard item */}
           <div 
-            className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'dashboard' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} 
             onClick={() => { setActiveTab('dashboard'); setActiveForm(null); }}
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -1239,73 +1594,73 @@ export default function DashboardClient({ initialData, user }) {
           {/* ADMIN SIDEBAR LINKS */}
           {isAdmin && (
             <>
-              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
+              <div className="sidebar-heading">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'refill' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
               >
                 <RefreshCw className="w-4 h-4" />
                 <span className="nav-text">Cylinder Refill Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'connection' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
               >
                 <UserPlus className="w-4 h-4" />
                 <span className="nav-text">New Connection (SBC/DBC)</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'incident' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
               >
                 <AlertOctagon className="w-4 h-4" />
                 <span className="nav-text">Incident / Complaint Entry</span>
               </div>
 
-              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">MANAGEMENT</div>
+              <div className="sidebar-heading">MANAGEMENT</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'commercial' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
               >
                 <Receipt className="w-4 h-4" />
                 <span className="nav-text">Commercial Credit</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'closing' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
               >
                 <Lock className="w-4 h-4" />
                 <span className="nav-text">Daily Closing</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
                 <span className="nav-text">Reports & Downloads</span>
               </div>
 
-              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">ADMINISTRATION</div>
+              <div className="sidebar-heading">ADMINISTRATION</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'staff' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'staff' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('staff'); setActiveForm(null); }}
               >
                 <Users className="w-4 h-4" />
                 <span className="nav-text">Staff Management</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'archive' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'archive' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('archive'); setActiveForm(null); }}
               >
                 <Database className="w-4 h-4" />
-                <span className="nav-text">Data Archive</span>
+                <span className="nav-text">Data Archive System</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'settings' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('settings'); setActiveForm(null); }}
               >
-                <Lock className="w-4 h-4" />
-                <span className="nav-text">Settings</span>
+                <Settings className="w-4 h-4" />
+                <span className="nav-text">Portal Parameters</span>
               </div>
             </>
           )}
@@ -1313,30 +1668,36 @@ export default function DashboardClient({ initialData, user }) {
           {/* EMPLOYEE SIDEBAR LINKS */}
           {isEmployee && (
             <>
-              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">OPERATIONS</div>
+              <div className="sidebar-heading">OPERATIONS</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'refill' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('refill'); setActiveForm(null); }}
+                className={`nav-item ${activeTab === 'refill' ? 'active' : ''} ${!dbData.isInitialized ? 'opacity-50 pointer-events-none' : ''}`} 
+                onClick={() => { if (dbData.isInitialized) { setActiveTab('refill'); setActiveForm(null); } }}
               >
-                <RefreshCw className="w-4 h-4" />
-                <span className="nav-text">Cylinder Refill Entry</span>
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="w-4 h-4" />
+                  <span className="nav-text">Cylinder Refill Entry</span>
+                </div>
+                {!dbData.isInitialized && <Lock className="w-3 h-3 text-red-500" />}
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'connection' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
-                onClick={() => { setActiveTab('connection'); setActiveForm(null); }}
+                className={`nav-item ${activeTab === 'connection' ? 'active' : ''} ${!dbData.isInitialized ? 'opacity-50 pointer-events-none' : ''}`} 
+                onClick={() => { if (dbData.isInitialized) { setActiveTab('connection'); setActiveForm(null); } }}
               >
-                <UserPlus className="w-4 h-4" />
-                <span className="nav-text">New Connection (SBC/DBC)</span>
+                <div className="flex items-center gap-3">
+                  <UserPlus className="w-4 h-4" />
+                  <span className="nav-text">New Connection (SBC/DBC)</span>
+                </div>
+                {!dbData.isInitialized && <Lock className="w-3 h-3 text-red-500" />}
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'incident' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'incident' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('incident'); setActiveForm(null); }}
               >
                 <AlertOctagon className="w-4 h-4" />
                 <span className="nav-text">Incident / Complaint Entry</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'my_entries' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'my_entries' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('my_entries'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
@@ -1348,30 +1709,30 @@ export default function DashboardClient({ initialData, user }) {
           {/* AUDITOR SIDEBAR LINKS */}
           {isAuditor && (
             <>
-              <div className="sidebar-heading text-[12px] font-bold uppercase tracking-[1px] text-[#001F5B] px-3 pt-4 pb-1">AUDIT</div>
+              <div className="sidebar-heading">AUDIT</div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'closing' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'closing' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('closing'); setActiveForm(null); }}
               >
                 <ClipboardCheck className="w-4 h-4" />
                 <span className="nav-text">Daily Closing Verification</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'commercial' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'commercial' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('commercial'); setActiveForm(null); }}
               >
                 <Receipt className="w-4 h-4" />
                 <span className="nav-text">Account Ledger</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'reports' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'reports' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('reports'); setActiveForm(null); }}
               >
                 <FileText className="w-4 h-4" />
                 <span className="nav-text">Reports & Downloads</span>
               </div>
               <div 
-                className={`nav-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition ${activeTab === 'auditor_uploads' ? 'bg-[#FFF4E8] text-[#001F5B] font-bold border-l-4 border-[#F37022]' : 'text-gray-600 hover:bg-gray-50'}`} 
+                className={`nav-item ${activeTab === 'auditor_uploads' ? 'active' : ''}`} 
                 onClick={() => { setActiveTab('auditor_uploads'); setActiveForm(null); }}
               >
                 <Database className="w-4 h-4" />
@@ -1382,265 +1743,364 @@ export default function DashboardClient({ initialData, user }) {
         </nav>
 
         {/* User Card */}
-        <div className="sidebar-footer border-t border-[#E8EAF0] pt-4 mt-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#001F5B]/10 flex items-center justify-center font-bold text-[#001F5B] text-xs">
-                {user.name.substring(0,2).toUpperCase()}
-              </div>
-              <div className="text-xs">
-                <p className="font-semibold text-gray-800 leading-tight">{user.name}</p>
-                <p className="text-gray-500 capitalize">{user.role.toLowerCase()}</p>
-              </div>
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="w-8 h-8 rounded-full bg-[#001F5B]/10 flex items-center justify-center font-bold text-[#001F5B] text-xs shrink-0 font-sans">
+              {user.role === 'ADMIN' || user.role === 'MANAGER' ? 'MS' : user.role === 'EMPLOYEE' ? 'ES' : 'AS'}
             </div>
-            <button 
-              onClick={() => signOut({ callbackUrl: '/sign-in' })}
-              className="p-1 rounded text-red-500 hover:bg-red-50 transition"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div>
+              <p>
+                {user.role === 'ADMIN' || user.role === 'MANAGER'
+                  ? 'Maa Santoshi' 
+                  : user.role === 'EMPLOYEE' 
+                    ? 'Employee Santoshi' 
+                    : 'Auditor Santoshi'}
+              </p>
+              <span>
+                {user.role === 'ADMIN' || user.role === 'MANAGER'
+                  ? 'Admin' 
+                  : user.role === 'EMPLOYEE' 
+                    ? 'Employee' 
+                    : 'Auditor'}
+              </span>
+            </div>
           </div>
+
+          <button onClick={() => signOut({ callbackUrl: '/sign-in' })} className="logout-button font-sans">
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
         </div>
       </aside>
 
-      {/* MAIN CONTAINER */}
-      <main className="app-content mt-[195px] sm:mt-[140px] lg:mt-[80px] pt-6 pb-20 md:pb-6 print:p-0 print:m-0 flex-1">
-        {!dbData.isInitialized ? (
-          activeTab === 'dashboard' ? (
-            /* SYSTEM NOT INITIALIZED GATE */
-            <div className="max-w-[1200px] mx-auto px-6 py-6 flex flex-col gap-6 w-full">
-              {isAdmin || user.role === 'AUDITOR' ? (
+      <div className="msigv-main">
+        {/* Header Block */}
+        <header className="msigv-header print:hidden">
+          {/* Left Block */}
+          <div className="header-title">
+            <h1 className="text-base font-bold text-[#001F5B] uppercase tracking-wide">LPG SECURELEDGER PORTAL</h1>
+            <p className="text-[11px] text-gray-500 mt-0.5">Internal LPG stock, refill & audit system</p>
+          </div>
+
+          {/* Right Block */}
+          <div className="header-meta">
+            {/* User box with profile dropdown */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="meta-box cursor-pointer hover:bg-gray-50 transition flex items-center gap-2"
+              >
+                <User className="w-3.5 h-3.5 text-[#001F5B] shrink-0" />
+                <span>
+                  {user.role === 'ADMIN' || user.role === 'MANAGER'
+                    ? 'Maa Santoshi' 
+                    : user.role === 'EMPLOYEE' 
+                      ? 'Employee Santoshi' 
+                      : 'Auditor Santoshi'}
+                </span>
+              </button>
+
+              {showProfileDropdown && (
                 <>
-                  {/* Information Banner (Issue #7) */}
-                  <div className="bg-[#EFF6FF] border border-[#BFD7FF] p-5 rounded-xl flex gap-3 text-[#001F5B] shadow-sm">
-                    <Info className="w-5 h-5 text-[#F37022] shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <h4 className="font-bold uppercase tracking-wide mb-1">Opening Stock Initialization</h4>
-                      <p className="leading-relaxed">
-                        This setup defines the opening inventory, regulators, suraksha hose pipes, and treasury balance for Maa Santoshi Indane Gramin Vitrak.
-                      </p>
-                      <p className="font-semibold mt-1.5 text-[#F37022]">
-                        * This action should only be performed by authorized Admin or Auditor.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Administration Setup Card (Issue #5) */}
-                  <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-sm">
-                    <div className="border-b border-[#D7DEE8] pb-4 mb-6">
-                      <h2 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
-                        Administration Setup
-                      </h2>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Configure Opening Inventory & Treasury
-                      </p>
-                    </div>
-
-                    {feedback && feedback.type === 'error' && (
-                      <div className="bg-red-50 text-red-700 p-3 rounded text-xs font-semibold mb-4">
-                        {feedback.message}
-                      </div>
-                    )}
-
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleFormSubmit('opening_stock');
-                      }}
-                      className="space-y-6"
+                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileDropdown(false)} />
+                  <div className="absolute right-0 mt-1 bg-white border border-[#C8D2E0] rounded-[4px] shadow-lg p-3 z-50 min-w-[200px] text-xs">
+                    <p className="font-bold text-[#02164F] mb-0.5">
+                      {user.role === 'ADMIN' || user.role === 'MANAGER'
+                        ? 'Maa Santoshi' 
+                        : user.role === 'EMPLOYEE' 
+                          ? 'Employee Santoshi' 
+                          : 'Auditor Santoshi'}
+                    </p>
+                    <p className="text-gray-500 mb-2 font-medium capitalize font-sans">{user.role.toLowerCase()}</p>
+                    <button 
+                      onClick={() => signOut({ callbackUrl: '/sign-in' })}
+                      className="w-full h-8 flex items-center justify-center gap-2 border border-red-200 hover:border-red-300 text-red-600 rounded bg-white font-bold transition font-sans"
                     >
-                      {/* Section A: Cylinder Inventory (Issue #8) */}
-                      <div>
-                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5">
-                          <Package className="w-3.5 h-3.5 text-[#F37022]" />
-                          Section A: Cylinder Inventory
-                        </h3>
-                        {/* Responsive 2-Column Grid (Issue #3 & Issue #9) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Setup Date*</label>
-                            <input
-                              type="date"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none font-semibold text-gray-800 w-full"
-                              value={openingStockForm.date}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, date: e.target.value }))}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Domestic 14.2kg Filled Stock*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.filled14}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, filled14: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Domestic 14.2kg Empty Stock*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.empty14}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, empty14: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Commercial 19kg Filled Stock*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.filled19}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, filled19: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1 text-xs font-semibold lg:col-span-2">
-                            <label className="text-gray-700">Commercial 19kg Empty Stock*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.empty19}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, empty19: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Section B: Accessories (Issue #8) */}
-                      <div>
-                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
-                          <Users className="w-3.5 h-3.5 text-[#F37022]" />
-                          Section B: Accessories
-                        </h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Regulators Qty*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.regulators}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, regulators: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1 text-xs font-semibold">
-                            <label className="text-gray-700">Suraksha Hose Pipes Qty*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.hosePipes}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, hosePipes: parseInt(e.target.value) || 0 }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Section C: Treasury (Issue #8) */}
-                      <div>
-                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
-                          <DollarSign className="w-3.5 h-3.5 text-[#F37022]" />
-                          Section C: Treasury
-                        </h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1 text-xs font-semibold lg:col-span-2">
-                            <label className="text-gray-700">Opening Treasury Cash (INR)*</label>
-                            <input
-                              type="number"
-                              min="0"
-                              required
-                              className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                              value={openingStockForm.openingCash}
-                              onChange={e => setOpeningStockForm(prev => ({ ...prev, openingCash: parseFloat(e.target.value) || 0 }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Section D: Reference (Issue #8) */}
-                      <div>
-                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-[1px] mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5 mt-2">
-                          <FileText className="w-3.5 h-3.5 text-[#F37022]" />
-                          Section D: Reference
-                        </h3>
-                        <div className="flex flex-col gap-1 text-xs font-semibold">
-                          <label className="text-gray-700">Remarks / Reference</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Starting opening balances setup"
-                            className="border border-[#D7DEE8] rounded px-3 h-[46px] text-sm focus:border-[#F37022] outline-none w-full"
-                            value={openingStockForm.remarks}
-                            onChange={e => setOpeningStockForm(prev => ({ ...prev, remarks: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Action Footer (Issue #4 & Issue #9) */}
-                      <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3 px-1">
-                        <button
-                          type="button"
-                          onClick={() => signOut({ callbackUrl: '/sign-in' })}
-                          className="w-full sm:w-auto px-6 h-[48px] bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 flex items-center justify-center"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="w-full sm:w-auto px-6 h-[48px] bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95 disabled:opacity-50 flex items-center justify-center"
-                        >
-                          {isSubmitting ? 'Initializing Stock...' : 'Save & Initialize Portal'}
-                        </button>
-                      </div>
-                    </form>
+                      <LogOut className="w-3.5 h-3.5" />
+                      Logout
+                    </button>
                   </div>
                 </>
-              ) : (
-                /* Plain message Screen for Employee */
-                <div className="bg-white border border-[#D7DEE8] rounded-xl p-8 shadow-sm text-center max-w-md mx-auto my-12">
-                  <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
-                  <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
-                    System Not Initialized
-                  </h3>
-                  <p className="text-xs text-gray-600 mt-2 leading-relaxed">
-                    System is not initialized. Please ask the Administrator to set the opening stock first.
-                  </p>
-                </div>
               )}
             </div>
-          ) : (
-            /* Warning Screen for other tabs when not initialized */
-            <div className="max-w-xl mx-auto my-12 text-center p-8 bg-white border border-[#D7DEE8] rounded-xl shadow-sm">
+
+            {/* SAP Code box */}
+            <div className="meta-box sap">
+              SAP Code: <span>283056</span>
+            </div>
+
+            {/* Date box */}
+            <div className="meta-box date">
+              Date: <span>{new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}</span>
+            </div>
+          </div>
+        </header>
+
+        <main className={`msigv-content ${user.role.toLowerCase()}-content pt-6 pb-20 md:pb-6 print:p-0 print:m-0`}>
+          {!dbData.isInitialized && !isTabAllowedWhenNotInitialized(activeTab) ? (
+            /* SYSTEM NOT INITIALIZED WARNING PANEL FOR RESTRICTED TABS */
+            <div className="max-w-xl mx-auto my-12 text-center p-8 bg-white border border-[#C8D2E0] rounded">
               <AlertTriangle className="w-12 h-12 text-[#F37022] mx-auto mb-4 animate-bounce" />
               <h3 className="text-lg font-bold text-[#001F5B] uppercase tracking-wide">
-                Opening Stock Setup Required
+                Stock Initialization Required
               </h3>
-              <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+              <p className="text-sm text-gray-600 mt-2 leading-relaxed font-semibold">
                 Please complete the LPG Opening Stock initialization on the Dashboard before accessing this feature.
               </p>
               <button 
                 onClick={() => setActiveTab('dashboard')}
-                className="mt-6 px-5 py-2.5 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded uppercase tracking-wider transition active:scale-95"
+                className="mt-6 px-5 py-2.5 bg-[#F37022] hover:bg-[#D9540C] text-white text-xs font-bold rounded transition active:scale-95"
               >
                 Go to Dashboard
               </button>
             </div>
-          )
-        ) : (
-          <>
-            {/* TOP STATUS BAR */}
-            <div className="top-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
+          ) : (
+            <>
+              {!dbData.isInitialized && activeTab === 'dashboard' ? (
+                /* SYSTEM NOT INITIALIZED GATE */
+                isEmployee ? (
+                  /* Employee System Not Initialized Dashboard screen */
+                  <section className="employee-init-state animate-fade-in">
+                    <div className="system-alert-panel flex flex-col items-center justify-center gap-4">
+                      <AlertTriangle className="w-12 h-12 text-[#F37022] animate-bounce" />
+                      <h2>SYSTEM NOT INITIALIZED</h2>
+                      <p>
+                        Opening stock has not been initialized yet.
+                        Please contact an Admin or Auditor to initialize opening stock before refill entries can be created.
+                      </p>
+                      <div className="border-t border-[#C8D2E0] pt-4 w-full mt-2 text-xs">
+                        <p className="text-xs font-bold text-[#001F5B] mb-2 uppercase tracking-wide">Allowed Actions</p>
+                        <div className="flex flex-col sm:flex-row justify-center gap-4">
+                          <button 
+                            onClick={() => setActiveTab('incident')} 
+                            className="px-4 py-2 bg-white border border-[#C8D2E0] text-gray-700 hover:bg-gray-50 text-xs font-bold rounded transition"
+                          >
+                            Incident / Complaint Entry
+                          </button>
+                          <button 
+                            onClick={() => setActiveTab('my_entries')} 
+                            className="px-4 py-2 bg-white border border-[#C8D2E0] text-gray-700 hover:bg-gray-50 text-xs font-bold rounded transition"
+                          >
+                            My Entries
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : (
+                  /* Admin/Auditor opening stock form */
+                  <div className="setup-page animate-fade-in">
+                    {/* Information Banner (Issue #7) */}
+                    <div className="setup-info-banner info-banner">
+                      <Info className="w-5 h-5 text-[#F37022] shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <h4 className="font-bold uppercase tracking-wide mb-1 text-[#001F5B]">OPENING STOCK INITIALIZATION</h4>
+                        <p className="leading-relaxed text-[#001F5B]">
+                          This setup defines the opening inventory, regulators, Suraksha hose pipes, and treasury balance.
+                        </p>
+                        <p className="font-semibold mt-1.5 text-red-600">
+                          * This action can be performed by authorized Admin or Auditor only.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Setup Form Panel */}
+                    <div className="setup-form-panel form-panel">
+                      <div className="form-panel-header">
+                        <h2 className="text-base font-bold text-[#001F5B] uppercase tracking-wide">
+                          {isAuditor ? "OPENING STOCK VERIFICATION / INITIALIZATION" : "ADMINISTRATION SETUP"}
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Configure opening inventory and treasury balance
+                        </p>
+                      </div>
+
+                      {feedback && feedback.type === 'error' && (
+                        <div className="bg-red-50 text-red-700 p-3 rounded text-xs font-semibold m-4 mb-0">
+                          {feedback.message}
+                        </div>
+                      )}
+
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleFormSubmit('opening_stock');
+                        }}
+                      >
+                        {/* Section A: Cylinder Inventory */}
+                        <div>
+                          <div className="section-header">
+                            <Package className="w-4 h-4 text-[#F37022] shrink-0" />
+                            <span>SECTION A: CYLINDER INVENTORY</span>
+                          </div>
+                          <div className="form-grid">
+                            <div className="input-group">
+                              <label className="input-label">Setup Date*</label>
+                              <input
+                                type="date"
+                                required
+                                className="input-field font-semibold text-gray-800"
+                                value={openingStockForm.date}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, date: e.target.value }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Domestic 14.2kg Filled Stock*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.filled14}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, filled14: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Domestic 14.2kg Empty Stock*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.empty14}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, empty14: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Commercial 19kg Filled Stock*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.filled19}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, filled19: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Commercial 19kg Empty Stock*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.empty19}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, empty19: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Opening Load Reference (Optional)</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. LOAD-2026-05-A"
+                                className="input-field"
+                                value={openingStockForm.loadReference}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, loadReference: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section B: Accessories */}
+                        <div>
+                          <div className="section-header">
+                            <Users className="w-4 h-4 text-[#F37022] shrink-0" />
+                            <span>SECTION B: ACCESSORIES</span>
+                          </div>
+                          <div className="form-grid">
+                            <div className="input-group">
+                              <label className="input-label">Regulators Qty*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.regulators}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, regulators: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                            <div className="input-group">
+                              <label className="input-label">Suraksha Hose Pipes Qty*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.hosePipes}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, hosePipes: parseInt(e.target.value) || 0 }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section C: Treasury */}
+                        <div>
+                          <div className="section-header">
+                            <DollarSign className="w-4 h-4 text-[#F37022] shrink-0" />
+                            <span>SECTION C: TREASURY</span>
+                          </div>
+                          <div className="form-grid">
+                            <div className="input-group">
+                              <label className="input-label">Opening Treasury Cash INR*</label>
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                className="input-field"
+                                value={openingStockForm.openingCash}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, openingCash: parseFloat(e.target.value) || 0 }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section D: Verification Remarks or Reference */}
+                        <div>
+                          <div className="section-header">
+                            <FileText className="w-4 h-4 text-[#F37022] shrink-0" />
+                            <span>{isAuditor ? "SECTION D: VERIFICATION REMARKS" : "SECTION D: REFERENCE"}</span>
+                          </div>
+                          <div className="form-grid">
+                            <div className="input-group lg:col-span-2">
+                              <label className="input-label">{isAuditor ? "Verification Remarks" : "Remarks / Reference"}</label>
+                              <input
+                                type="text"
+                                placeholder={isAuditor ? "Add verification check remarks..." : "e.g. Starting opening balances setup"}
+                                className="input-field"
+                                value={openingStockForm.remarks}
+                                onChange={e => setOpeningStockForm(prev => ({ ...prev, remarks: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Footer */}
+                        <div className="form-actions font-sans">
+                          <button
+                            type="button"
+                            onClick={() => signOut({ callbackUrl: '/sign-in' })}
+                            className="btn-cancel-sarkari"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="btn-save-sarkari"
+                          >
+                            {isSubmitting 
+                              ? (isAuditor ? 'Verifying Stock...' : 'Initializing Stock...') 
+                              : (isAuditor ? 'Verify & Initialize Stock' : 'Save & Initialize Portal')}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <>
+                  {/* TOP STATUS BAR */}
+                  <div className="top-bar flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 print:hidden">
               <div className="search-container flex items-center gap-2 bg-white border border-[#E8EAF0] px-3 py-1.5 rounded-lg flex-1 max-w-md">
                 <Search className="w-4 h-4 text-gray-400" />
                 <input 
@@ -1668,9 +2128,9 @@ export default function DashboardClient({ initialData, user }) {
 
         {/* ------------------- MAIN TAB RENDERINGS ------------------- */}
         <div>
-            {activeTab === 'customer' && (
+            {activeTab === 'customer' && isAdmin && (
               <GenericFormShell
-                title="1. Customer Creation Form"
+                title="CUSTOMER PROFILE CREATION"
                 subtitle="Create a domestic/commercial customer profile in the ledger"
                 instructions={[
                   "Provide the exact Consumer ID and mobile matches to ensure proper SDMS verification.",
@@ -1749,10 +2209,11 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeTab === 'refill' && (
-              <GenericFormShell
-                title="Cylinder Refill Entry Form"
-                subtitle="Log cylinder refill sales for domestic (14.2 kg) or commercial (19 kg) customers."
+            {activeTab === 'refill' && (isAdmin || isEmployee) && (
+              <SarkariFormPage
+                category="EMPLOYEE OPERATIONS"
+                title="CYLINDER REFILL ENTRY"
+                subtitle="Record refill delivery and empty cylinder collection."
                 instructions={[
                   "Select the correct Refill Cylinder Type to apply the default settings rate.",
                   "DAC Code is required for domestic sales if applicable (6 digits)."
@@ -1781,210 +2242,268 @@ export default function DashboardClient({ initialData, user }) {
                     remarks: ''
                   });
                 }}
-                onClose={resetActiveForm}
+                onCancel={resetActiveForm}
                 onSubmit={() => handleFormSubmit('refill')}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Refill Type Toggle */}
-                  <div className="sm:col-span-2 flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Refill Cylinder Type*</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRefillForm(prev => ({
-                            ...prev,
-                            refillType: 'DOMESTIC_14_2',
-                            ratePerCylinder: settingsForm.domesticRate,
-                            amountReceived: settingsForm.domesticRate * prev.quantityDelivered,
-                            paymentMode: 'CASH'
-                          }));
-                        }}
-                        className={`py-3 px-4 border rounded text-xs font-bold transition text-center uppercase tracking-wider ${
-                          refillForm.refillType === 'DOMESTIC_14_2'
-                            ? 'bg-[#001F5B] text-white border-[#001F5B]'
-                            : 'bg-white text-[#001F5B] border-[#D7DEE8] hover:bg-gray-50'
-                        }`}
-                      >
-                        Domestic (14.2 kg)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRefillForm(prev => ({
-                            ...prev,
-                            refillType: 'COMMERCIAL_19',
-                            ratePerCylinder: settingsForm.commercialRate,
-                            amountReceived: 0,
-                            paymentMode: 'CREDIT'
-                          }));
-                        }}
-                        className={`py-3 px-4 border rounded text-xs font-bold transition text-center uppercase tracking-wider ${
-                          refillForm.refillType === 'COMMERCIAL_19'
-                            ? 'bg-[#001F5B] text-white border-[#001F5B]'
-                            : 'bg-white text-[#001F5B] border-[#D7DEE8] hover:bg-gray-50'
-                        }`}
-                      >
-                        Commercial (19 kg)
-                      </button>
+                {/* SECTION A: REFILL DETAILS */}
+                <div>
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION A: REFILL DETAILS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Refill Type Toggle */}
+                    <div className="sm:col-span-2 flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Refill Cylinder Type*</label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRefillForm(prev => ({
+                              ...prev,
+                              refillType: 'DOMESTIC_14_2',
+                              ratePerCylinder: settingsForm.domesticRate,
+                              amountReceived: settingsForm.domesticRate * prev.quantityDelivered,
+                              paymentMode: 'CASH'
+                            }));
+                          }}
+                          className={`py-2.5 px-4 border rounded-[4px] text-xs font-bold transition text-center uppercase tracking-wider ${
+                            refillForm.refillType === 'DOMESTIC_14_2'
+                              ? 'bg-[#001F5B] text-white border-[#001F5B]'
+                              : 'bg-white text-[#001F5B] border-[#C8D2E0] hover:bg-gray-50'
+                          }`}
+                        >
+                          Domestic (14.2 kg)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRefillForm(prev => ({
+                              ...prev,
+                              refillType: 'COMMERCIAL_19',
+                              ratePerCylinder: settingsForm.commercialRate,
+                              amountReceived: 0,
+                              paymentMode: 'CREDIT'
+                            }));
+                          }}
+                          className={`py-2.5 px-4 border rounded-[4px] text-xs font-bold transition text-center uppercase tracking-wider ${
+                            refillForm.refillType === 'COMMERCIAL_19'
+                              ? 'bg-[#001F5B] text-white border-[#001F5B]'
+                              : 'bg-white text-[#001F5B] border-[#C8D2E0] hover:bg-gray-50'
+                          }`}
+                        >
+                          Commercial (19 kg)
+                        </button>
+                      </div>
                     </div>
-                  </div>
- 
-                  {/* Delivery Date */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Delivery Date*</label>
-                    <input
-                      type="date"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.deliveryDate}
-                      onChange={e => setRefillForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                    />
-                  </div>
- 
-                  {/* Delivery Staff */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Delivery Staff*</label>
-                    <select
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
-                      value={refillForm.employeeId}
-                      onChange={e => setRefillForm(prev => ({ ...prev, employeeId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Staff --</option>
-                      {dbData.employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
-                  </div>
- 
-                  {/* Customer Details section */}
-                  {renderCustomerSection(
-                    refillForm.refillType === 'COMMERCIAL_19' ? 'commercial' : 'refill',
-                    refillForm,
-                    setRefillForm
-                  )}
- 
-                  {/* Quantity Delivered */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Cylinders Delivered (Qty)*</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.quantityDelivered}
-                      onChange={e => {
-                        const qty = parseInt(e.target.value) || 0;
-                        setRefillForm(prev => ({
-                          ...prev,
-                          quantityDelivered: qty,
-                          amountReceived: prev.paymentMode === 'CREDIT' ? 0 : qty * prev.ratePerCylinder
-                        }));
-                      }}
-                    />
-                  </div>
- 
-                  {/* Quantity Empty Returned */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Empties Returned (Qty)*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.emptyReturned}
-                      onChange={e => setRefillForm(prev => ({ ...prev, emptyReturned: parseInt(e.target.value) || 0 }))}
-                    />
-                  </div>
- 
-                  {/* Rate per Cylinder */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Rate per Cylinder (INR)*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.ratePerCylinder}
-                      onChange={e => {
-                        const rate = parseFloat(e.target.value) || 0;
-                        setRefillForm(prev => ({
-                          ...prev,
-                          ratePerCylinder: rate,
-                          amountReceived: prev.paymentMode === 'CREDIT' ? 0 : prev.quantityDelivered * rate
-                        }));
-                      }}
-                    />
-                  </div>
- 
-                  {/* Payment Mode */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Payment Mode*</label>
-                    <select
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white font-semibold text-gray-800"
-                      value={refillForm.paymentMode}
-                      onChange={e => {
-                        const mode = e.target.value;
-                        setRefillForm(prev => ({
-                          ...prev,
-                          paymentMode: mode,
-                          amountReceived: mode === 'CREDIT' ? 0 : prev.quantityDelivered * prev.ratePerCylinder
-                        }));
-                      }}
-                    >
-                      <option value="CASH">Cash in Hand</option>
-                      <option value="UPI">UPI Digital Payment</option>
-                      <option value="CREDIT">Store Credit / Outstanding</option>
-                    </select>
-                  </div>
- 
-                  {/* Amount Received */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Amount Received (INR)*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.amountReceived}
-                      onChange={e => setRefillForm(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
-                    />
-                  </div>
- 
-                  {/* DAC Code (Domestic only) */}
-                  {refillForm.refillType === 'DOMESTIC_14_2' && (
+
+                    {/* Delivery Date */}
                     <div className="flex flex-col gap-1 text-xs">
-                      <label className="font-semibold text-gray-700">DAC Code (6-digit Distributor Code)</label>
+                      <label className="font-semibold text-gray-700">Delivery Date*</label>
                       <input
-                        type="text"
-                        maxLength={6}
-                        placeholder="e.g. 123456"
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-mono"
-                        value={refillForm.dacCode}
-                        onChange={e => setRefillForm(prev => ({ ...prev, dacCode: e.target.value }))}
+                        type="date"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.deliveryDate}
+                        onChange={e => setRefillForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
                       />
                     </div>
-                  )}
- 
-                  {/* Remarks */}
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
-                    <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
-                    <input
-                      type="text"
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none"
-                      value={refillForm.remarks}
-                      onChange={e => setRefillForm(prev => ({ ...prev, remarks: e.target.value }))}
-                    />
+
+                    {/* Quantity Delivered */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Cylinders Delivered (Qty)*</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.quantityDelivered}
+                        onChange={e => {
+                          const qty = parseInt(e.target.value) || 0;
+                          setRefillForm(prev => ({
+                            ...prev,
+                            quantityDelivered: qty,
+                            amountReceived: prev.paymentMode === 'CREDIT' ? 0 : qty * prev.ratePerCylinder
+                          }));
+                        }}
+                      />
+                    </div>
+
+                    {/* Quantity Empty Returned */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Empties Returned (Qty)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.emptyReturned}
+                        onChange={e => setRefillForm(prev => ({ ...prev, emptyReturned: parseInt(e.target.value) || 0 }))}
+                      />
+                    </div>
+
+                    {/* Rate per Cylinder */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Rate per Cylinder (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.ratePerCylinder}
+                        onChange={e => {
+                          const rate = parseFloat(e.target.value) || 0;
+                          setRefillForm(prev => ({
+                            ...prev,
+                            ratePerCylinder: rate,
+                            amountReceived: prev.paymentMode === 'CREDIT' ? 0 : prev.quantityDelivered * rate
+                          }));
+                        }}
+                      />
+                    </div>
+
+                    {/* Payment Mode */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Payment Mode*</label>
+                      <select
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                        value={refillForm.paymentMode}
+                        onChange={e => {
+                          const mode = e.target.value;
+                          setRefillForm(prev => ({
+                            ...prev,
+                            paymentMode: mode,
+                            amountReceived: mode === 'CREDIT' ? 0 : prev.quantityDelivered * prev.ratePerCylinder
+                          }));
+                        }}
+                      >
+                        <option value="CASH">Cash in Hand</option>
+                        <option value="UPI">UPI Digital Payment</option>
+                        <option value="CREDIT">Store Credit / Outstanding</option>
+                      </select>
+                    </div>
+
+                    {/* Amount Received */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Amount Received (INR)*</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.amountReceived}
+                        onChange={e => setRefillForm(prev => ({ ...prev, amountReceived: parseFloat(e.target.value) || 0 }))}
+                      />
+                    </div>
+
+                    {/* DAC Code (Domestic only) */}
+                    {refillForm.refillType === 'DOMESTIC_14_2' && (
+                      <div className="flex flex-col gap-1 text-xs">
+                        <label className="font-semibold text-gray-700">DAC Code (6-digit Distributor Code)</label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="e.g. 123456"
+                          className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-mono"
+                          value={refillForm.dacCode}
+                          onChange={e => setRefillForm(prev => ({ ...prev, dacCode: e.target.value }))}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
-              </GenericFormShell>
+
+                {/* SECTION B: CUSTOMER DETAILS */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION B: CUSTOMER DETAILS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Customer Name*</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. Ramesh Kumar"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={refillForm.customerName || ''} 
+                        onChange={e => setRefillForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Consumer Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 750012903"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={refillForm.consumerNumber || ''} 
+                        onChange={e => setRefillForm(prev => ({ ...prev, consumerNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Mobile Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 9876543210"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={refillForm.mobileNumber || ''} 
+                        onChange={e => setRefillForm(prev => ({ ...prev, mobileNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Address</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Village Rampur"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={refillForm.address || ''} 
+                        onChange={e => setRefillForm(prev => ({ ...prev, address: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION C: REMARKS & SIGN-OFF */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION C: REMARKS & SIGN-OFF
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Delivery Staff */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Delivery Staff*</label>
+                      <select
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-semibold"
+                        value={refillForm.employeeId}
+                        onChange={e => setRefillForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      >
+                        <option value="">-- Choose Staff --</option>
+                        {dbData.employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                      <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
+                      <input
+                        type="text"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800"
+                        value={refillForm.remarks}
+                        onChange={e => setRefillForm(prev => ({ ...prev, remarks: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </SarkariFormPage>
             )}
 
-            {activeTab === 'connection' && (
-              <GenericFormShell
-                title="4. New Connection Form"
+            {activeTab === 'connection' && (isAdmin || isEmployee) && (
+              <SarkariFormPage
+                category="EMPLOYEE OPERATIONS"
+                title="NEW CONNECTION (SBC / DBC)"
                 subtitle="Issue a new SBC/DBC connection contract (Domestic)"
                 instructions={[
                   "Connection costs are pre-calculated based on state security deposits.",
@@ -1993,111 +2512,122 @@ export default function DashboardClient({ initialData, user }) {
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
                 onReset={() => { setSuccessFormPayload(null); setConnectionForm({ customerName: '', mobile: '', address: '', connectionType: 'SINGLE_BOTTLE', relationshipId: '', upgradeType: 'NEW', stoveIncluded: false, regulatorIncluded: true, hosePipeIncluded: true, lpgCardBookRequired: true, eKycDone: true, eKycCharges: 50.0, lpgCardBookCharges: 100.0, totalAmount: 3750.0, amountPaid: 3750.0, paymentMode: 'CASH', staffId: dbData.employees[0]?.id || '', connectionDate: new Date().toISOString().split('T')[0], remarks: '' }); }}
-                onClose={resetActiveForm}
+                onCancel={resetActiveForm}
                 onSubmit={() => handleFormSubmit('connection')}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Applicant Name */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Applicant Full Name*</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={connectionForm.customerName} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, customerName: e.target.value }))}
-                    />
+                {/* SECTION A: CONTRACT DETAILS */}
+                <div>
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION A: CONTRACT DETAILS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Applicant Name */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Applicant Full Name*</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        value={connectionForm.customerName} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      />
+                    </div>
+                    {/* Mobile */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Mobile Number*</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        value={connectionForm.mobile} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, mobile: e.target.value }))}
+                      />
+                    </div>
+                    {/* Connection Date */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Connection Date*</label>
+                      <input 
+                        type="date" 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        value={connectionForm.connectionDate} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, connectionDate: e.target.value }))}
+                      />
+                    </div>
+                    {/* Staff Assigned */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Staff Assigned*</label>
+                      <select 
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-semibold"
+                        value={connectionForm.staffId} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, staffId: e.target.value }))}
+                      >
+                        <option value="">-- Choose Staff --</option>
+                        {dbData.employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Connection Type */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Connection Category (Cylinders)*</label>
+                      <select 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                        value={connectionForm.connectionType} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, connectionType: e.target.value }))}
+                      >
+                        <option value="SINGLE_BOTTLE">Single Bottle Connection (SBC) [1 Cyl]</option>
+                        <option value="DOUBLE_BOTTLE">Double Bottle Connection (DBC) [2 Cyl]</option>
+                      </select>
+                    </div>
+                    {/* Upgrade Type */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Upgrade / Connection Type*</label>
+                      <select 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                        value={connectionForm.upgradeType} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, upgradeType: e.target.value }))}
+                      >
+                        <option value="NEW">New Connection</option>
+                        <option value="SINGLE_TO_DOUBLE">Single-to-Double Upgrade</option>
+                        <option value="TRANSFER">Transfer Connection</option>
+                        <option value="OTHER">Other / Special</option>
+                      </select>
+                    </div>
+                    {/* Existing Relationship ID */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Existing Relationship ID (Optional)</label>
+                      <input 
+                        type="text" 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        placeholder="e.g. 700019283"
+                        value={connectionForm.relationshipId} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, relationshipId: e.target.value }))}
+                      />
+                    </div>
+                    {/* Payment Mode */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Payment Mode*</label>
+                      <select 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                        value={connectionForm.paymentMode} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, paymentMode: e.target.value }))}
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="UPI">UPI / Online</option>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                      </select>
+                    </div>
                   </div>
-                  {/* Mobile */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Mobile Number*</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={connectionForm.mobile} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, mobile: e.target.value }))}
-                    />
-                  </div>
-                  {/* Connection Date */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Connection Date*</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={connectionForm.connectionDate} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, connectionDate: e.target.value }))}
-                    />
-                  </div>
-                  {/* Staff Assigned */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Staff Assigned*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={connectionForm.staffId} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, staffId: e.target.value }))}
-                    >
-                      <option value="">-- Choose Staff --</option>
-                      {dbData.employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {/* Connection Type */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Connection Category (Cylinders)*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={connectionForm.connectionType} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, connectionType: e.target.value }))}
-                    >
-                      <option value="SINGLE_BOTTLE">Single Bottle Connection (SBC) [1 Cyl]</option>
-                      <option value="DOUBLE_BOTTLE">Double Bottle Connection (DBC) [2 Cyl]</option>
-                    </select>
-                  </div>
-                  {/* Upgrade Type */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Upgrade / Connection Type*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={connectionForm.upgradeType} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, upgradeType: e.target.value }))}
-                    >
-                      <option value="NEW">New Connection</option>
-                      <option value="SINGLE_TO_DOUBLE">Single-to-Double Upgrade</option>
-                      <option value="TRANSFER">Transfer Connection</option>
-                      <option value="OTHER">Other / Special</option>
-                    </select>
-                  </div>
-                  {/* Existing Relationship ID */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Existing Relationship ID (Optional)</label>
-                    <input 
-                      type="text" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      placeholder="e.g. 700019283"
-                      value={connectionForm.relationshipId} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, relationshipId: e.target.value }))}
-                    />
-                  </div>
-                  {/* Payment Mode */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Payment Mode*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={connectionForm.paymentMode} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, paymentMode: e.target.value }))}
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="UPI">UPI / Online</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
-                    </select>
-                  </div>
+                </div>
 
-                  {/* Hardware details */}
-                  <div className="sm:col-span-2 border-t border-gray-100 pt-3 mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* SECTION B: HARDWARE & CHARGES */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION B: HARDWARE & CHARGES
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="flex items-center gap-2 text-xs">
                       <input 
                         type="checkbox" 
@@ -2136,8 +2666,7 @@ export default function DashboardClient({ initialData, user }) {
                     </div>
                   </div>
 
-                  {/* KYC & Cards */}
-                  <div className="sm:col-span-2 border-t border-gray-100 pt-3 mt-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="border-t border-gray-100 pt-3 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs">
                         <input 
@@ -2157,7 +2686,7 @@ export default function DashboardClient({ initialData, user }) {
                           <input 
                             type="number" 
                             min="0"
-                            className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
+                            className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
                             value={connectionForm.eKycCharges} 
                             onChange={e => setConnectionForm(prev => ({ ...prev, eKycCharges: e.target.value }))}
                           />
@@ -2184,7 +2713,7 @@ export default function DashboardClient({ initialData, user }) {
                           <input 
                             type="number" 
                             min="0"
-                            className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
+                            className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
                             value={connectionForm.lpgCardBookCharges} 
                             onChange={e => setConnectionForm(prev => ({ ...prev, lpgCardBookCharges: e.target.value }))}
                           />
@@ -2192,54 +2721,62 @@ export default function DashboardClient({ initialData, user }) {
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Installation Address */}
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2 border-t border-gray-100 pt-3">
-                    <label className="font-semibold text-gray-700">Installation Address*</label>
-                    <textarea 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none h-16"
-                      value={connectionForm.address} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, address: e.target.value }))}
-                    />
-                  </div>
+                {/* SECTION C: INSTALLATION & REMARKS */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION C: INSTALLATION & REMARKS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Installation Address */}
+                    <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                      <label className="font-semibold text-gray-700">Installation Address*</label>
+                      <textarea 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 h-16"
+                        value={connectionForm.address} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, address: e.target.value }))}
+                      />
+                    </div>
 
-                  {/* Auto-calculated total and paid */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Total Calculated Contract Charge (INR)</label>
-                    <div className="border border-[#E8EAF0] bg-gray-50 rounded p-2 text-sm font-bold text-[#02164F]">
-                      ₹{connectionForm.totalAmount}
+                    {/* Auto-calculated total and paid */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Total Calculated Contract Charge (INR)</label>
+                      <div className="border border-[#C8D2E0] bg-gray-50 rounded-[4px] p-2 text-sm font-bold text-[#001F5B]">
+                        ₹{connectionForm.totalAmount}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Amount Received from Customer (INR)*</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        required
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-green-700 font-bold" 
+                        value={connectionForm.amountPaid} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, amountPaid: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                      <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
+                      <input 
+                        type="text" 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        value={connectionForm.remarks} 
+                        onChange={e => setConnectionForm(prev => ({ ...prev, remarks: e.target.value }))}
+                      />
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Amount Received from Customer (INR)*</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none font-bold text-green-700" 
-                      value={connectionForm.amountPaid} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, amountPaid: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
-                    <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
-                    <input 
-                      type="text" 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={connectionForm.remarks} 
-                      onChange={e => setConnectionForm(prev => ({ ...prev, remarks: e.target.value }))}
-                    />
-                  </div>
                 </div>
-              </GenericFormShell>
+              </SarkariFormPage>
             )}
 
-            {activeTab === 'empty_return' && (
+            {activeTab === 'empty_return' && isAdmin && (
               <GenericFormShell
-                title="5. Empty Return Form"
+                title="EMPTY CYLINDER RETURN"
                 subtitle="Record cylinder returns from a commercial or credit customer"
                 instructions={[
                   "Returns update empty stock balances in the godown.",
@@ -2300,7 +2837,7 @@ export default function DashboardClient({ initialData, user }) {
 
             {activeTab === 'load' && isAdmin && (
               <GenericFormShell
-                title="6. refinery truck Unload Entry Form"
+                title="REFINERY TRUCK UNLOAD ENTRY"
                 subtitle="Record incoming truck loads from LPG refinery bottling plants"
                 instructions={[
                   "Unloading loads increments filled stocks and decrements empty stocks sent back to the bottling plant.",
@@ -2457,7 +2994,7 @@ export default function DashboardClient({ initialData, user }) {
 
             {activeTab === 'closing' && isAdmin && (
               <GenericFormShell
-                title="7. Daily Closing stock count Form"
+                title="DAILY CLOSING STOCK COUNT"
                 subtitle="Lock end-of-day godown stock counts and audit mismatches"
                 instructions={[
                   "Must be locked every evening. Physical stocks are compared with expected database counts.",
@@ -2570,10 +3107,11 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeTab === 'incident' && (
-              <GenericFormShell
-                title="8. Cylinder Incident / Damage Form"
-                subtitle="Isolate damaged, valve defect, or leaking cylinders immediately"
+            {activeTab === 'incident' && (isAdmin || isEmployee) && (
+              <SarkariFormPage
+                category="EMPLOYEE OPERATIONS"
+                title="INCIDENT / COMPLAINT ENTRY"
+                subtitle="Report leakage, damage, regulator issues, customer complaints and operational incidents."
                 instructions={[
                   "Leakages decrement filled stock and increment leakage stock.",
                   "Damages / defects decrement empty stock and increment damaged stock."
@@ -2581,217 +3119,262 @@ export default function DashboardClient({ initialData, user }) {
                 isSubmitting={isSubmitting}
                 successData={successFormPayload}
                 onReset={() => { setSuccessFormPayload(null); setIncidentForm({ incidentDate: new Date().toISOString().split('T')[0], incidentCategory: 'Cylinder', cylinderType: 'DOMESTIC_14_2', issueType: 'Leakage', quantity: 1, regulatorSerialNumber: '', hosePipeReturned: false, hosePipeQuantity: 0, reportedBy: '', customerId: '', linkExistingCustomer: false, customerName: '', consumerNumber: '', mobileNumber: '', address: '', detectedBy: dbData.employees[0]?.id || '', location: 'godown', remarks: '', photoUrl: '' }); }}
-                onClose={resetActiveForm}
+                onCancel={resetActiveForm}
                 onSubmit={() => handleFormSubmit('incident')}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Date */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Incident Date*</label>
-                    <input 
-                      type="date" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      value={incidentForm.incidentDate} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, incidentDate: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Category */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Incident Category*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={incidentForm.incidentCategory} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, incidentCategory: e.target.value }))}
-                    >
-                      <option value="Cylinder">Cylinder Issue</option>
-                      <option value="Regulator">Regulator Defect / Return</option>
-                      <option value="Hose Pipe">Hose Pipe Issue</option>
-                      <option value="Delivery">Delivery Incident</option>
-                      <option value="Customer Complaint">Customer Complaint</option>
-                      <option value="Other">Other / Miscellaneous</option>
-                    </select>
-                  </div>
-
-                  {/* Cylinder Type (only if category is Cylinder) */}
-                  {incidentForm.incidentCategory === 'Cylinder' && (
+                {/* SECTION A: INCIDENT DETAILS */}
+                <div>
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION A: INCIDENT DETAILS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Date */}
                     <div className="flex flex-col gap-1 text-xs">
-                      <label className="font-semibold text-gray-700">Cylinder Type*</label>
+                      <label className="font-semibold text-gray-700">Incident Date*</label>
+                      <input 
+                        type="date" 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        value={incidentForm.incidentDate} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, incidentDate: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Incident Category*</label>
                       <select 
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                        value={incidentForm.cylinderType} 
-                        onChange={e => setIncidentForm(prev => ({ ...prev, cylinderType: e.target.value }))}
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-semibold"
+                        value={incidentForm.incidentCategory} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, incidentCategory: e.target.value }))}
                       >
-                        <option value="DOMESTIC_14_2">Domestic (14.2 kg)</option>
-                        <option value="COMMERCIAL_19">Commercial (19 kg)</option>
-                        <option value="NA">Not Applicable (NA)</option>
+                        <option value="Cylinder">Cylinder Issue</option>
+                        <option value="Regulator">Regulator Defect / Return</option>
+                        <option value="Hose Pipe">Hose Pipe Issue</option>
+                        <option value="Delivery">Delivery Incident</option>
+                        <option value="Customer Complaint">Customer Complaint</option>
+                        <option value="Other">Other / Miscellaneous</option>
                       </select>
                     </div>
-                  )}
 
-                  {/* Issue / Defect Type */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Issue / Defect Type*</label>
-                    <select 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={incidentForm.issueType} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, issueType: e.target.value }))}
-                    >
-                      <option value="Leakage">Gas Leakage</option>
-                      <option value="Damage">Physical Body Damage</option>
-                      <option value="Valve Issue">Defective Valve</option>
-                      <option value="Regulator Defect">Regulator Malfunction</option>
-                      <option value="Hose Pipe Return">Hose Pipe Replacement/Return</option>
-                      <option value="Seal Issue">Seal Broken / Weight Shortage</option>
-                      <option value="Other">Other Observation</option>
-                    </select>
-                  </div>
+                    {/* Cylinder Type (only if category is Cylinder) */}
+                    {incidentForm.incidentCategory === 'Cylinder' && (
+                      <div className="flex flex-col gap-1 text-xs">
+                        <label className="font-semibold text-gray-700">Cylinder Type*</label>
+                        <select 
+                          className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                          value={incidentForm.cylinderType} 
+                          onChange={e => setIncidentForm(prev => ({ ...prev, cylinderType: e.target.value }))}
+                        >
+                          <option value="DOMESTIC_14_2">Domestic (14.2 kg)</option>
+                          <option value="COMMERCIAL_19">Commercial (19 kg)</option>
+                          <option value="NA">Not Applicable (NA)</option>
+                        </select>
+                      </div>
+                    )}
 
-                  {/* Quantity */}
-                  {['Cylinder', 'Regulator', 'Hose Pipe'].includes(incidentForm.incidentCategory) && (
+                    {/* Issue / Defect Type */}
                     <div className="flex flex-col gap-1 text-xs">
-                      <label className="font-semibold text-gray-700">Quantity Affected*</label>
-                      <input 
-                        type="number" 
-                        min="1" 
-                        required 
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                        value={incidentForm.quantity} 
-                        onChange={e => setIncidentForm(prev => ({ ...prev, quantity: e.target.value }))}
-                      />
+                      <label className="font-semibold text-gray-700">Issue / Defect Type*</label>
+                      <select 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium"
+                        value={incidentForm.issueType} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, issueType: e.target.value }))}
+                      >
+                        <option value="Leakage">Gas Leakage</option>
+                        <option value="Damage">Physical Body Damage</option>
+                        <option value="Valve Issue">Defective Valve</option>
+                        <option value="Regulator Defect">Regulator Malfunction</option>
+                        <option value="Hose Pipe Return">Hose Pipe Replacement/Return</option>
+                        <option value="Seal Issue">Seal Broken / Weight Shortage</option>
+                        <option value="Other">Other Observation</option>
+                      </select>
                     </div>
-                  )}
 
-                  {/* Regulator Serial Number (only if Regulator category) */}
-                  {incidentForm.incidentCategory === 'Regulator' && (
+                    {/* Quantity */}
+                    {['Cylinder', 'Regulator', 'Hose Pipe'].includes(incidentForm.incidentCategory) && (
+                      <div className="flex flex-col gap-1 text-xs">
+                        <label className="font-semibold text-gray-700">Quantity Affected*</label>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          required 
+                          className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                          value={incidentForm.quantity} 
+                          onChange={e => setIncidentForm(prev => ({ ...prev, quantity: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    {/* Regulator Serial Number (only if Regulator category) */}
+                    {incidentForm.incidentCategory === 'Regulator' && (
+                      <div className="flex flex-col gap-1 text-xs">
+                        <label className="font-semibold text-gray-700">Regulator Serial Number (Free Text)*</label>
+                        <input 
+                          type="text" 
+                          required
+                          placeholder="e.g. REG-89201"
+                          className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                          value={incidentForm.regulatorSerialNumber} 
+                          onChange={e => setIncidentForm(prev => ({ ...prev, regulatorSerialNumber: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    {/* Hose Pipe Returned (only if Hose Pipe category) */}
+                    {incidentForm.incidentCategory === 'Hose Pipe' && (
+                      <>
+                        <div className="flex items-center gap-2 mt-4 text-xs">
+                          <input 
+                            type="checkbox" 
+                            id="hosePipeReturned"
+                            className="w-4 h-4 rounded border-gray-300"
+                            checked={incidentForm.hosePipeReturned} 
+                            onChange={e => setIncidentForm(prev => ({ ...prev, hosePipeReturned: e.target.checked }))}
+                          />
+                          <label htmlFor="hosePipeReturned" className="font-semibold text-gray-700 cursor-pointer">
+                            Hose Pipe Returned to Stock
+                          </label>
+                        </div>
+                        {incidentForm.hosePipeReturned && (
+                          <div className="flex flex-col gap-1 text-xs">
+                            <label className="font-semibold text-gray-700">Hose Pipe Quantity Returned*</label>
+                            <input 
+                              type="number" 
+                              min="1"
+                              required
+                              className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                              value={incidentForm.hosePipeQuantity} 
+                              onChange={e => setIncidentForm(prev => ({ ...prev, hosePipeQuantity: e.target.value }))}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Reported By */}
                     <div className="flex flex-col gap-1 text-xs">
-                      <label className="font-semibold text-gray-700">Regulator Serial Number (Free Text)*</label>
+                      <label className="font-semibold text-gray-700">Reported By (Person)*</label>
                       <input 
                         type="text" 
-                        required
-                        placeholder="e.g. REG-89201"
-                        className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                        value={incidentForm.regulatorSerialNumber} 
-                        onChange={e => setIncidentForm(prev => ({ ...prev, regulatorSerialNumber: e.target.value }))}
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        placeholder="e.g. Employee or Customer name"
+                        value={incidentForm.reportedBy} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, reportedBy: e.target.value }))}
                       />
                     </div>
-                  )}
-
-                  {/* Hose Pipe Returned (only if Hose Pipe category) */}
-                  {incidentForm.incidentCategory === 'Hose Pipe' && (
-                    <>
-                      <div className="flex items-center gap-2 mt-4 text-xs">
-                        <input 
-                          type="checkbox" 
-                          id="hosePipeReturned"
-                          className="w-4 h-4 rounded border-gray-300"
-                          checked={incidentForm.hosePipeReturned} 
-                          onChange={e => setIncidentForm(prev => ({ ...prev, hosePipeReturned: e.target.checked }))}
-                        />
-                        <label htmlFor="hosePipeReturned" className="font-semibold text-gray-700 cursor-pointer">
-                          Hose Pipe Returned to Stock
-                        </label>
-                      </div>
-                      {incidentForm.hosePipeReturned && (
-                        <div className="flex flex-col gap-1 text-xs">
-                          <label className="font-semibold text-gray-700">Hose Pipe Quantity Returned*</label>
-                          <input 
-                            type="number" 
-                            min="1"
-                            required
-                            className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                            value={incidentForm.hosePipeQuantity} 
-                            onChange={e => setIncidentForm(prev => ({ ...prev, hosePipeQuantity: e.target.value }))}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Reported By */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Reported By (Person)*</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      placeholder="e.g. Employee or Customer name"
-                      value={incidentForm.reportedBy} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, reportedBy: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Detected By Staff Link */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Detected By Staff Link*</label>
-                    <select 
-                      required
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                      value={incidentForm.detectedBy} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, detectedBy: e.target.value }))}
-                    >
-                      <option value="">-- Choose Staff --</option>
-                      {dbData.employees.map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {renderCustomerSection('incident', incidentForm, setIncidentForm)}
-
-                  {/* Location */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <label className="font-semibold text-gray-700">Incident Location*</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none" 
-                      placeholder="e.g. Godown Shelf A, or delivery truck"
-                      value={incidentForm.location} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, location: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Photo upload optional */}
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
-                    <label className="font-semibold text-gray-700">Attach Incident Photo (Optional)</label>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      className="border border-[#E8EAF0] rounded p-1.5 text-xs outline-none bg-gray-50 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setIncidentForm(prev => ({ ...prev, photoUrl: reader.result }));
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                    {incidentForm.photoUrl && (
-                      <img src={incidentForm.photoUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg border border-[#E8EAF0] mt-2 animate-fade-in" />
-                    )}
-                  </div>
-
-                  {/* Remarks */}
-                  <div className="flex flex-col gap-1 text-xs sm:col-span-2">
-                    <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
-                    <textarea 
-                      className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none h-16"
-                      value={incidentForm.remarks} 
-                      onChange={e => setIncidentForm(prev => ({ ...prev, remarks: e.target.value }))}
-                    />
                   </div>
                 </div>
-              </GenericFormShell>
+
+                {/* SECTION B: CUSTOMER DETAILS */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION B: CUSTOMER DETAILS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Consumer Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 750012903"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={incidentForm.consumerNumber || ''} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, consumerNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Customer Name</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Ramesh Kumar"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={incidentForm.customerName || ''} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, customerName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Mobile Number</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 9876543210"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={incidentForm.mobileNumber || ''} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, mobileNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Address</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Village Rampur"
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 font-medium" 
+                        value={incidentForm.address || ''} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, address: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION C: LOCATION & REMARKS */}
+                <div className="border-t border-[#D6DEE8] pt-4 mt-6">
+                  <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 bg-gray-50 p-2 border-l-4 border-[#F37022]">
+                    SECTION C: LOCATION & REMARKS
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Location */}
+                    <div className="flex flex-col gap-1 text-xs">
+                      <label className="font-semibold text-gray-700">Incident Location*</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800" 
+                        placeholder="e.g. Godown Shelf A, or delivery truck"
+                        value={incidentForm.location} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, location: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* Photo upload optional */}
+                    <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                      <label className="font-semibold text-gray-700">Attach Incident Photo (Optional)</label>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        className="border border-[#C8D2E0] rounded-[4px] p-1.5 text-xs outline-none bg-gray-50 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setIncidentForm(prev => ({ ...prev, photoUrl: reader.result }));
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      {incidentForm.photoUrl && (
+                        <img src={incidentForm.photoUrl} alt="Preview" className="w-full h-32 object-cover rounded-[4px] border border-[#D6DEE8] mt-2 animate-fade-in" />
+                      )}
+                    </div>
+
+                    {/* Remarks */}
+                    <div className="flex flex-col gap-1 text-xs sm:col-span-2">
+                      <label className="font-semibold text-gray-700">Remarks / Operational Details</label>
+                      <textarea 
+                        className="border border-[#C8D2E0] rounded-[4px] p-2 text-sm focus:border-[#001F5B] outline-none bg-white text-gray-800 h-16"
+                        value={incidentForm.remarks} 
+                        onChange={e => setIncidentForm(prev => ({ ...prev, remarks: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </SarkariFormPage>
             )}
 
             {activeTab === 'expense' && isAdmin && (
               <GenericFormShell
-                title="9. Expense Entry Form"
+                title="EXPENSE ENTRY"
                 subtitle="Record warehouse expenses, rent, or staff wage payments"
                 instructions={[
                   "Wages paid here reconcile daily closing balances.",
@@ -2876,9 +3459,9 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
 
-            {activeTab === 'payment' && (
+            {activeTab === 'payment' && isAdmin && (
               <GenericFormShell
-                title="10. Customer Payment Entry Form"
+                title="CUSTOMER PAYMENT ENTRY"
                 subtitle="Log payments received from credit/commercial customers"
                 instructions={[
                   "Decrements the customer's outstanding commercial credit balance.",
@@ -2940,7 +3523,7 @@ export default function DashboardClient({ initialData, user }) {
 
             {activeTab === 'invoice' && isAdmin && (
               <GenericFormShell
-                title="11. Custom Invoice Creation Form"
+                title="CUSTOM INVOICE CREATION"
                 subtitle="Issue a commercial cylinder invoice"
                 instructions={[
                   "Standard invoice format for wholesale dispatches.",
@@ -3015,7 +3598,7 @@ export default function DashboardClient({ initialData, user }) {
 
             {activeTab === 'stock_adjustment' && isAdmin && (
               <GenericFormShell
-                title="12. Stock Adjustment Form"
+                title="STOCK ADJUSTMENT"
                 subtitle="Tune warehouse stock balances directly with audit trails"
                 instructions={[
                   "Warning: This action directly updates database stock without operational sales.",
@@ -3090,7 +3673,7 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
  
-            {activeTab === 'settings' && (
+            {activeTab === 'settings' && isAdmin && (
               <div className="bg-white border border-[#D7DEE8] rounded-xl p-6 shadow-sm max-w-2xl mx-auto my-8">
                 <div className="border-b border-[#D7DEE8] pb-4 mb-6">
                   <h2 className="text-xl font-bold text-[#001F5B]">Default LPG Price & Fee Settings</h2>
@@ -3162,7 +3745,7 @@ export default function DashboardClient({ initialData, user }) {
               </div>
             )}
  
-            {activeTab === 'auditor_uploads' && (
+            {activeTab === 'auditor_uploads' && isAuditor && (
               <GenericFormShell
                 title="Auditor Verification Upload"
                 subtitle="Submit physical verification audits and verification documents."
@@ -3224,49 +3807,63 @@ export default function DashboardClient({ initialData, user }) {
               </GenericFormShell>
             )}
  
-            {activeTab === 'my_entries' && (
-              <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm max-w-5xl mx-auto my-8">
-                <div className="border-b border-gray-100 pb-3 mb-4">
-                  <h3 className="text-sm font-bold text-[#02164F]">My Submissions Log</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Below are your recent refill deliveries and connection logs awaiting audit approval.</p>
+            {activeTab === 'my_entries' && isEmployee && (
+              <div className="bg-white border border-[#D6DEE8] rounded-[4px] p-5 shadow-none max-w-5xl mx-auto my-6 employee-shell">
+                {/* Header */}
+                <div className="mb-6 border-b border-[#D6DEE8] pb-4">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">EMPLOYEE OPERATIONS</span>
+                  <h2 className="text-xl font-bold text-[#001F5B] uppercase tracking-wide mt-0.5">EMPLOYEE ACTIVITY SUMMARY</h2>
+                  <p className="text-xs text-gray-600 mt-1">Track and manage your submitted transactions awaiting audit verification.</p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs text-left">
-                    <thead className="bg-gray-50 border-b border-gray-100 font-bold text-gray-700">
-                      <tr>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2">Customer</th>
-                        <th className="px-3 py-2">Type</th>
-                        <th className="px-3 py-2">Quantity</th>
-                        <th className="px-3 py-2">Amount Paid</th>
-                        <th className="px-3 py-2">Verification Status</th>
+
+                {/* Activity metrics cards grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white border border-[#D6DEE8] rounded-[4px] p-4 flex flex-col justify-between">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Refills Submitted Today</span>
+                    <div className="text-xl font-bold text-[#001F5B] mt-2 font-mono">{employeeRefillsToday}</div>
+                  </div>
+                  <div className="bg-white border border-[#D6DEE8] rounded-[4px] p-4 flex flex-col justify-between">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Connections Submitted Today</span>
+                    <div className="text-xl font-bold text-[#001F5B] mt-2 font-mono">{employeeConnectionsToday}</div>
+                  </div>
+                  <div className="bg-white border border-[#D6DEE8] rounded-[4px] p-4 flex flex-col justify-between">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Incidents Submitted Today</span>
+                    <div className="text-xl font-bold text-[#001F5B] mt-2 font-mono">{employeeIncidentsToday}</div>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto border border-[#D6DEE8] rounded-[4px]">
+                  <table className="w-full text-xs text-left border-collapse bg-white">
+                    <thead>
+                      <tr className="border-b border-[#D6DEE8] bg-gray-50 font-bold text-gray-700">
+                        <th className="px-4 py-2.5">Date</th>
+                        <th className="px-4 py-2.5">Type</th>
+                        <th className="px-4 py-2.5">Consumer</th>
+                        <th className="px-4 py-2.5 text-center">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {filteredDeliveries.map(del => {
-                        const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
-                        const statusColor = del.verificationStatus === 'APPROVED' 
-                          ? 'bg-green-100 text-green-700' 
-                          : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
-                        const item = del.deliveryItems?.[0] || {};
+                    <tbody className="divide-y divide-[#D6DEE8]">
+                      {recentActivities.map(act => {
+                        const statusColor = act.status === 'APPROVED' 
+                          ? 'bg-green-100 text-green-700 border-green-200' 
+                          : (act.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-red-100 text-red-700 border-red-200');
                         return (
-                          <tr key={del.id} className="hover:bg-gray-50/50">
-                            <td className="px-3 py-2">{new Date(del.deliveryDate).toLocaleDateString()}</td>
-                            <td className="px-3 py-2 font-semibold text-gray-800">{del.customerName || cust.name}</td>
-                            <td className="px-3 py-2">{item.cylinderType === 'DOMESTIC_14_2' ? 'Domestic 14.2kg' : 'Commercial 19kg'}</td>
-                            <td className="px-3 py-2">{item.quantityDelivered || 0} Delivered / {item.emptyReturned || 0} Empty</td>
-                            <td className="px-3 py-2">₹{del.amountReceived} / ₹{del.totalAmount}</td>
-                            <td className="px-3 py-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${statusColor}`}>
-                                {del.verificationStatus}
+                          <tr key={act.id} className="hover:bg-gray-50/50">
+                            <td className="px-4 py-2.5 font-medium">{new Date(act.date).toLocaleDateString('en-GB').replace(/\//g, '-')}</td>
+                            <td className="px-4 py-2.5 font-bold text-[#001F5B]">{act.type}</td>
+                            <td className="px-4 py-2.5 font-semibold text-gray-800">{act.consumer}</td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className={`inline-block px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase border ${statusColor}`}>
+                                {act.status}
                               </span>
                             </td>
                           </tr>
                         );
                       })}
-                      {filteredDeliveries.length === 0 && (
+                      {recentActivities.length === 0 && (
                         <tr>
-                          <td colSpan="6" className="text-center text-gray-400 py-8">No submissions found.</td>
+                          <td colSpan="4" className="text-center text-gray-400 py-8 font-medium">No activity recorded yet.</td>
                         </tr>
                       )}
                     </tbody>
@@ -3727,13 +4324,55 @@ export default function DashboardClient({ initialData, user }) {
                 {/* EMPLOYEE DASHBOARD VIEW */}
                 {/* ========================================================================= */}
                 {isEmployee && (
-                  <div className="space-y-6 animate-fade-in">
+                  <div className="space-y-6 animate-fade-in employee-shell">
+                    {/* Today's Summary Grid */}
+                    <div>
+                      <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-3">Today's Summary</h3>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="employee-card flex flex-col justify-between">
+                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Refills Delivered</span>
+                          <div className="text-2xl font-bold text-[#001F5B] mt-2">
+                            {refillTodayCount}
+                          </div>
+                          <span className="text-[10px] text-gray-400 mt-1">Refills completed today</span>
+                        </div>
+
+                        <div className="employee-card flex flex-col justify-between">
+                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">New Connections</span>
+                          <div className="text-2xl font-bold text-[#001F5B] mt-2">
+                            {connectionsTodayCount}
+                          </div>
+                          <span className="text-[10px] text-gray-400 mt-1">Contracts verified today</span>
+                        </div>
+
+                        <div className="employee-card flex flex-col justify-between">
+                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Incidents Logged</span>
+                          <div className="text-2xl font-bold text-red-600 mt-2">
+                            {incidentsTodayCount}
+                          </div>
+                          <span className="text-[10px] text-gray-400 mt-1">Defects/leakages reported</span>
+                        </div>
+
+                        <div className="employee-card flex flex-col justify-between">
+                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Today's Collections</span>
+                          <div className="text-2xl font-bold text-green-700 mt-2">
+                            ₹{totalCollectionToday.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-gray-400 mt-1">Total cash receipts today</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Action Cards */}
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#02164F] mb-4">LPG Ledger Input Actions</h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="employee-card">
+                      <h3 className="text-sm font-bold text-[#001F5B] mb-4">LPG Operations Quick Actions</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <button 
                           onClick={() => {
+                            if (!dbData.isInitialized) {
+                              showFeedback('error', 'Cylinder Refill Entry is disabled until Opening Stock is initialized.');
+                              return;
+                            }
                             setRefillForm(prev => ({
                               ...prev,
                               refillType: 'DOMESTIC_14_2',
@@ -3743,107 +4382,126 @@ export default function DashboardClient({ initialData, user }) {
                             }));
                             setActiveTab('refill');
                           }}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-[#F37022] hover:bg-gray-50 transition text-center"
+                          disabled={!dbData.isInitialized}
+                          className={`flex flex-col items-center gap-2 p-4 rounded border text-center transition ${
+                            !dbData.isInitialized 
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
+                              : 'bg-white text-gray-800 border-gray-100 hover:border-[#F37022] hover:bg-gray-50'
+                          }`}
                         >
-                          <Receipt className="w-6 h-6 text-[#F37022]" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">Add Domestic Sale</span>
+                          <Receipt className={`w-6 h-6 ${!dbData.isInitialized ? 'text-gray-400' : 'text-[#F37022]'}`} />
+                          <span className="text-xs font-bold font-sans">Cylinder Refill Entry</span>
+                          {!dbData.isInitialized && (
+                            <span className="text-[9px] text-red-500 font-semibold mt-1">Locked (Init Required)</span>
+                          )}
                         </button>
+
                         <button 
                           onClick={() => {
-                            setRefillForm(prev => ({
-                              ...prev,
-                              refillType: 'COMMERCIAL_19',
-                              ratePerCylinder: settingsForm.commercialRate,
-                              amountReceived: 0,
-                              paymentMode: 'CREDIT'
-                            }));
-                            setActiveTab('refill');
+                            if (!dbData.isInitialized) {
+                              showFeedback('error', 'New Connection Entry is disabled until Opening Stock is initialized.');
+                              return;
+                            }
+                            setActiveTab('connection');
                           }}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-[#02164F] hover:bg-gray-50 transition text-center"
+                          disabled={!dbData.isInitialized}
+                          className={`flex flex-col items-center gap-2 p-4 rounded border text-center transition ${
+                            !dbData.isInitialized 
+                              ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
+                              : 'bg-white text-gray-800 border-gray-100 hover:border-blue-600 hover:bg-gray-50'
+                          }`}
                         >
-                          <Receipt className="w-6 h-6 text-[#02164F]" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">Add Commercial Sale</span>
+                          <UserPlus className={`w-6 h-6 ${!dbData.isInitialized ? 'text-gray-400' : 'text-blue-600'}`} />
+                          <span className="text-xs font-bold font-sans">New Connection (SBC/DBC)</span>
+                          {!dbData.isInitialized && (
+                            <span className="text-[9px] text-red-500 font-semibold mt-1">Locked (Init Required)</span>
+                          )}
                         </button>
-                        <button 
-                          onClick={() => setActiveTab('connection')}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-blue-600 hover:bg-gray-50 transition text-center"
-                        >
-                          <UserPlus className="w-6 h-6 text-blue-600" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">New Connection SBC/DBC</span>
-                        </button>
-                        <button 
-                          onClick={() => setActiveTab('empty_return')}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-orange-500 hover:bg-gray-50 transition text-center"
-                        >
-                          <Truck className="w-6 h-6 text-orange-500" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">Empty Return Entry</span>
-                        </button>
-                        <button 
-                          onClick={() => setActiveTab('payment')}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-green-600 hover:bg-gray-50 transition text-center"
-                        >
-                          <DollarSign className="w-6 h-6 text-green-600" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">Customer Payment</span>
-                        </button>
+
                         <button 
                           onClick={() => setActiveTab('incident')}
-                          className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-red-600 hover:bg-gray-50 transition text-center"
+                          className="flex flex-col items-center gap-2 p-4 rounded border bg-white border-gray-100 hover:border-red-600 hover:bg-gray-50 transition text-center cursor-pointer"
                         >
                           <AlertOctagon className="w-6 h-6 text-red-600" />
-                          <span className="text-xs font-semibold text-gray-800 font-medium">Report Damage / Leakage</span>
+                          <span className="text-xs font-bold font-sans">Incident / Complaint</span>
+                          <span className="text-[9px] text-green-600 font-semibold mt-1">Always Active</span>
+                        </button>
+
+                        <button 
+                          onClick={() => setActiveTab('my_entries')}
+                          className="flex flex-col items-center gap-2 p-4 rounded border bg-white border-gray-100 hover:border-green-600 hover:bg-gray-50 transition text-center cursor-pointer"
+                        >
+                          <FileText className="w-6 h-6 text-green-600" />
+                          <span className="text-xs font-bold font-sans">My Entries History</span>
+                          <span className="text-[9px] text-green-600 font-semibold mt-1">Always Active</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* My Recent Submissions List */}
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#02164F] mb-4">My Recent Submissions</h3>
-                      <div className="space-y-3.5">
-                        {filteredDeliveries.slice(0, 8).map(del => {
-                          const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
-                          const statusColor = del.verificationStatus === 'APPROVED' 
-                            ? 'bg-green-100 text-green-700' 
-                            : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
-                          const item = del.deliveryItems?.[0] || {};
-                          return (
-                            <div key={del.id} className="flex justify-between items-center text-xs border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
-                              <div>
-                                <p className="font-bold text-gray-800">{del.customerName || cust.name}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">{new Date(del.deliveryDate).toLocaleDateString()}</p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="text-right">
-                                  <p className="font-semibold text-gray-800">₹{del.totalAmount}</p>
-                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase mt-1 ${statusColor}`}>
-                                    {del.verificationStatus}
-                                  </span>
-                                </div>
-                                <button 
-                                  onClick={() => triggerPrintJob('invoice', {
-                                    invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
-                                    invoiceDate: del.deliveryDate,
-                                    customerName: del.customerName || cust.name,
-                                    quantity: item.quantityDelivered,
-                                    rate: item.ratePerCylinder,
-                                    totalAmount: del.totalAmount,
-                                    paidAmount: del.amountReceived,
-                                    balanceAmount: del.amountPending,
-                                    paymentStatus: del.paymentStatus
-                                  })}
-                                  className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
-                                  title="Print Slip"
-                                >
-                                  <Printer className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {filteredDeliveries.length === 0 && (
-                          <div className="text-center text-gray-400 py-12 text-xs">
-                            No submissions recorded yet.
-                          </div>
-                        )}
+                    {/* My Recent Submissions Table */}
+                    <div className="employee-card">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-bold text-[#001F5B]">My Recent Submissions</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
+                              <th className="p-3">Date</th>
+                              <th className="p-3">Customer</th>
+                              <th className="p-3">Details</th>
+                              <th className="p-3">Total Amount</th>
+                              <th className="p-3">Status</th>
+                              <th className="p-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {filteredDeliveries.slice(0, 8).map(del => {
+                              const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
+                              const statusColor = del.verificationStatus === 'APPROVED' 
+                                ? 'bg-green-100 text-green-700' 
+                                : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
+                              const item = del.deliveryItems?.[0] || {};
+                              return (
+                                <tr key={del.id} className="hover:bg-gray-50/50">
+                                  <td className="p-3 font-medium">{new Date(del.deliveryDate).toLocaleDateString()}</td>
+                                  <td className="p-3 font-semibold text-gray-800">{del.customerName || cust.name}</td>
+                                  <td className="p-3">{item.quantityDelivered || 0} unit ({item.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'})</td>
+                                  <td className="p-3 font-semibold">₹{del.totalAmount}</td>
+                                  <td className="p-3">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${statusColor}`}>
+                                      {del.verificationStatus}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-right">
+                                    <button 
+                                      onClick={() => triggerPrintJob('invoice', {
+                                        invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
+                                        invoiceDate: del.deliveryDate,
+                                        customerName: del.customerName || cust.name,
+                                        quantity: item.quantityDelivered,
+                                        rate: item.ratePerCylinder,
+                                        totalAmount: del.totalAmount,
+                                        paidAmount: del.amountReceived,
+                                        balanceAmount: del.amountPending,
+                                        paymentStatus: del.paymentStatus
+                                      })}
+                                      className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
+                                      title="Print Slip"
+                                    >
+                                      <Printer className="w-4 h-4 inline" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {filteredDeliveries.length === 0 && (
+                              <tr>
+                                <td colSpan="6" className="text-center text-gray-400 py-8">No submissions recorded yet.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
@@ -3853,259 +4511,266 @@ export default function DashboardClient({ initialData, user }) {
                 {/* AUDITOR DASHBOARD VIEW */}
                 {/* ========================================================================= */}
                 {isAuditor && (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 animate-fade-in">
-                    {/* Financial Summary & PDF downloads */}
-                    <div className="lg:col-span-2 space-y-6">
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-                          <h3 className="text-sm font-bold text-[#02164F]">Financial Ledger Summary</h3>
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => triggerPrintJob('account_ledger', {})} 
-                              className="px-2.5 py-1 bg-white border border-[#E8EAF0] text-gray-700 hover:bg-gray-50 text-[10px] rounded font-bold transition flex items-center gap-1"
-                            >
-                              <Printer className="w-3 h-3" /> Account Ledger
-                            </button>
-                            <button 
-                              onClick={() => triggerPrintJob('commercial_ledger', {})} 
-                              className="px-2.5 py-1 bg-white border border-[#E8EAF0] text-gray-700 hover:bg-gray-50 text-[10px] rounded font-bold transition flex items-center gap-1"
-                            >
-                              <Printer className="w-3 h-3" /> Commercial Ledger
-                            </button>
+                  <div className="space-y-6 animate-fade-in auditor-shell">
+                    {/* Auditor Metric Cards Grid */}
+                    <div>
+                      <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-3">Key Audit Metrics</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {/* 1. Gross Cash */}
+                        <div className="auditor-card flex flex-col justify-between">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Gross Cash Received</span>
+                          <div className="text-xl font-bold text-green-700 mt-2 font-mono">
+                            ₹{(dbData.kpis?.todayCashCollection || 0).toLocaleString()}
                           </div>
+                          <span className="text-[9px] text-gray-400 mt-1">Today's total receipts</span>
                         </div>
-                        <div className="space-y-3.5">
-                          <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2.5">
-                            <span className="text-gray-500 font-medium">Gross Cash Received today:</span>
-                            <span className="font-bold text-[#02164F] text-sm">₹{dbData.kpis?.todayCashCollection?.toLocaleString() || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2.5">
-                            <span className="text-gray-500 font-medium">Staff Wages paid today:</span>
-                            <span className="font-bold text-red-600 text-sm">₹{dbData.kpis?.staffPaymentsToday?.toLocaleString() || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2.5">
-                            <span className="text-gray-500 font-medium">Credit rollovers outstanding:</span>
-                            <span className="font-bold text-yellow-600 text-sm">₹{dbData.kpis?.pendingCommercialAmount?.toLocaleString() || 0}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs pt-2">
-                            <span className="text-gray-800 font-bold text-sm">Estimated Operational Treasury Balance:</span>
-                            <span className="font-extrabold text-green-600 text-sm">₹{((dbData.kpis?.todayCashCollection || 0) - (dbData.kpis?.staffPaymentsToday || 0)).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Daily Invoices list for Auditor */}
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                        <h3 className="text-sm font-bold text-[#02164F] mb-4">Daily Invoices</h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs text-left border-collapse min-w-[500px]">
-                            <thead>
-                              <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
-                                <th className="p-3">Invoice No</th>
-                                <th className="p-3">Date</th>
-                                <th className="p-3">Customer</th>
-                                <th className="p-3">Total Amount</th>
-                                <th className="p-3">Status</th>
-                                <th className="p-3 text-right">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {dbData.invoices?.slice(0, 5).map(inv => {
-                                const cust = dbData.customers?.find(c => c.id === inv.customerId) || { name: 'Direct Customer' };
-                                return (
-                                  <tr key={inv.id} className="hover:bg-gray-50/50">
-                                    <td className="p-3 font-mono font-bold text-[#02164F]">{inv.invoiceNumber}</td>
-                                    <td className="p-3">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
-                                    <td className="p-3 font-semibold">{inv.customerName || cust.name}</td>
-                                    <td className="p-3">₹{inv.totalAmount}</td>
-                                    <td className="p-3">
-                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${inv.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                        {inv.paymentStatus}
-                                      </span>
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <button 
-                                        onClick={() => triggerPrintJob('invoice', {
-                                          invoiceNumber: inv.invoiceNumber,
-                                          invoiceDate: inv.invoiceDate,
-                                          customerName: inv.customerName || cust.name,
-                                          quantity: inv.quantity,
-                                          rate: inv.rate,
-                                          totalAmount: inv.totalAmount,
-                                          paidAmount: inv.paidAmount,
-                                          balanceAmount: inv.balanceAmount,
-                                          paymentStatus: inv.paymentStatus
-                                        })}
-                                        className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
-                                        title="Print Invoice"
-                                      >
-                                        <Printer className="w-4 h-4 inline" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              {(!dbData.invoices || dbData.invoices.length === 0) && (
-                                <tr>
-                                  <td colSpan="6" className="text-center text-gray-400 py-6">No invoices created yet.</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                        {/* 2. Expenses */}
+                        <div className="auditor-card flex flex-col justify-between">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Operational Expenses</span>
+                          <div className="text-xl font-bold text-red-600 mt-2 font-mono">
+                            ₹{(dbData.kpis?.staffPaymentsToday || 0).toLocaleString()}
+                          </div>
+                          <span className="text-[9px] text-gray-400 mt-1">Wages paid out today</span>
                         </div>
-                      </div>
 
-                      {/* Daily Closing Reports list for Auditor */}
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                        <h3 className="text-sm font-bold text-[#02164F] mb-4">Daily Closing Reports</h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs text-left border-collapse min-w-[500px]">
-                            <thead>
-                              <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
-                                <th className="p-3">Closing Date</th>
-                                <th className="p-3">Physical 14.2 Filled</th>
-                                <th className="p-3">Physical 19 Filled</th>
-                                <th className="p-3">Cash in Hand</th>
-                                <th className="p-3">Mismatch</th>
-                                <th className="p-3 text-right">Actions</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {dbData.dailyClosings?.slice(0, 5).map(close => (
-                                  <tr key={close.id} className="hover:bg-gray-50/50">
-                                    <td className="p-3 font-semibold">{new Date(close.closingDate).toLocaleDateString()}</td>
-                                    <td className="p-3">{close.physical14Filled}</td>
-                                    <td className="p-3">{close.physical19Filled}</td>
-                                    <td className="p-3">₹{close.cashInHand?.toLocaleString()}</td>
-                                    <td className="p-3">
-                                      {close.mismatch14Filled !== 0 || close.mismatch14Empty !== 0 ? (
-                                        <span className="text-red-600 font-bold">Yes</span>
-                                      ) : (
-                                        <span className="text-green-600">None</span>
-                                      )}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <button 
-                                        onClick={() => triggerPrintJob('closing', close)}
-                                        className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
-                                        title="Print Closing Report"
-                                      >
-                                        <Printer className="w-4 h-4 inline" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              {(!dbData.dailyClosings || dbData.dailyClosings.length === 0) && (
-                                <tr>
-                                  <td colSpan="6" className="text-center text-gray-400 py-6">No closing reports logged.</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                        {/* 3. Credit Outstanding */}
+                        <div className="auditor-card flex flex-col justify-between">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Outstanding Credit</span>
+                          <div className="text-xl font-bold text-yellow-600 mt-2 font-mono">
+                            ₹{(dbData.kpis?.pendingCommercialAmount || 0).toLocaleString()}
+                          </div>
+                          <span className="text-[9px] text-gray-400 mt-1">Commercial outstanding</span>
+                        </div>
+
+                        {/* 4. Expected Closing Stock */}
+                        <div className="auditor-card flex flex-col justify-between">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Expected Stock</span>
+                          <div className="text-xl font-bold text-[#001F5B] mt-2 font-mono">
+                            {((dbData.inventory?.domestic?.filledStock || 0) + (dbData.inventory?.commercial?.filledStock || 0))} Cyl
+                          </div>
+                          <span className="text-[9px] text-gray-400 mt-1">Ledger filled cylinder total</span>
+                        </div>
+
+                        {/* 5. Mismatch Status */}
+                        <div className="auditor-card flex flex-col justify-between">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Ledger Reconciliation</span>
+                          <div className={`text-xs font-bold px-2 py-1 rounded mt-2 border text-center ${
+                            hasMismatch 
+                              ? 'text-red-700 bg-red-50 border-red-200' 
+                              : 'text-green-700 bg-green-50 border-green-200'
+                          }`}>
+                            {hasMismatch ? 'MISMATCH DETECTED' : 'LEDGER RECONCILED'}
+                          </div>
+                          <span className="text-[9px] text-gray-400 mt-1">
+                            {hasMismatch ? 'Audit counts show discrepancy' : 'Physical counts match books'}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right column: Physical Verification Form & Logs */}
-                    <div className="space-y-6">
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                        <h3 className="text-sm font-bold text-[#02164F] mb-3">Auditor - Physical Verification Upload</h3>
-                        <form onSubmit={handleAuditorVerificationSubmit} className="space-y-4">
-                          <div className="flex flex-col gap-1 text-xs">
-                            <label className="font-semibold text-gray-700">Verification Date*</label>
-                            <input 
-                              type="date" 
-                              required
-                              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white" 
-                              value={auditorVerificationForm.verificationDate}
-                              onChange={e => setAuditorVerificationForm(prev => ({ ...prev, verificationDate: e.target.value }))}
-                            />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Left: Table views */}
+                      <div className="lg:col-span-2 space-y-6">
+                        {/* Current Stock Inventory Registry */}
+                        <div className="auditor-card">
+                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider flex items-center gap-2">
+                            <Database className="w-4 h-4 text-[#F37022]" />
+                            <span>Current Stock Inventory Registry</span>
+                          </h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
+                                  <th className="p-3">Cylinder Category</th>
+                                  <th className="p-3 text-center">Filled Cylinders</th>
+                                  <th className="p-3 text-center">Empty Cylinders</th>
+                                  <th className="p-3 text-center">Problem / Defective</th>
+                                  <th className="p-3 text-right">Total Registry</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 text-gray-700">
+                                <tr className="hover:bg-gray-50/50">
+                                  <td className="p-3 font-semibold text-gray-800">Domestic Cylinders (14.2 kg)</td>
+                                  <td className="p-3 text-center font-mono font-bold text-[#001F5B]">{dbData.inventory?.domestic?.filledStock || 0}</td>
+                                  <td className="p-3 text-center font-mono">{dbData.inventory?.domestic?.emptyStock || 0}</td>
+                                  <td className="p-3 text-center font-mono text-red-500">{dbData.inventory?.domestic?.damagedStock || 0}</td>
+                                  <td className="p-3 text-right font-mono font-semibold">{(dbData.inventory?.domestic?.filledStock || 0) + (dbData.inventory?.domestic?.emptyStock || 0)}</td>
+                                </tr>
+                                <tr className="hover:bg-gray-50/50">
+                                  <td className="p-3 font-semibold text-gray-800">Commercial Cylinders (19.0 kg)</td>
+                                  <td className="p-3 text-center font-mono font-bold text-[#001F5B]">{dbData.inventory?.commercial?.filledStock || 0}</td>
+                                  <td className="p-3 text-center font-mono">{dbData.inventory?.commercial?.emptyStock || 0}</td>
+                                  <td className="p-3 text-center font-mono text-red-500">{dbData.inventory?.commercial?.damagedStock || 0}</td>
+                                  <td className="p-3 text-right font-mono font-semibold">{(dbData.inventory?.commercial?.filledStock || 0) + (dbData.inventory?.commercial?.emptyStock || 0)}</td>
+                                </tr>
+                                <tr className="hover:bg-gray-50/50">
+                                  <td className="p-3 font-semibold text-gray-800">LPG Regulators</td>
+                                  <td className="p-3 text-center font-mono font-bold text-[#001F5B]">{dbData.inventory?.regulators || 0}</td>
+                                  <td className="p-3 text-center font-mono text-gray-300">-</td>
+                                  <td className="p-3 text-center font-mono text-gray-300">-</td>
+                                  <td className="p-3 text-right font-mono font-semibold">{dbData.inventory?.regulators || 0}</td>
+                                </tr>
+                                <tr className="hover:bg-gray-50/50">
+                                  <td className="p-3 font-semibold text-gray-800">Suraksha Hose Pipes</td>
+                                  <td className="p-3 text-center font-mono font-bold text-[#001F5B]">{dbData.inventory?.hosePipes || 0}</td>
+                                  <td className="p-3 text-center font-mono text-gray-300">-</td>
+                                  <td className="p-3 text-center font-mono text-gray-300">-</td>
+                                  <td className="p-3 text-right font-mono font-semibold">{dbData.inventory?.hosePipes || 0}</td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
+                        </div>
 
-                          <div className="flex flex-col gap-1 text-xs">
-                            <label className="font-semibold text-gray-700">Link Closing Report (Optional)</label>
-                            <select 
-                              className="border border-[#E8EAF0] rounded p-2 text-sm focus:border-[#F37022] outline-none bg-white"
-                              value={auditorVerificationForm.closingId || ''}
-                              onChange={e => setAuditorVerificationForm(prev => ({ ...prev, closingId: e.target.value }))}
-                            >
-                              <option value="">-- No link --</option>
-                              {dbData.dailyClosings?.map(close => (
-                                <option key={close.id} value={close.id}>Report: {new Date(close.closingDate).toLocaleDateString()}</option>
-                              ))}
-                            </select>
+                        {/* Daily EOD Verification preview */}
+                        <div className="auditor-card">
+                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider">Daily Closing Reports (EOD Logs)</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
+                                  <th className="p-3">Closing Date</th>
+                                  <th className="p-3">Physical 14.2 Filled/Empty</th>
+                                  <th className="p-3">Physical 19 Filled/Empty</th>
+                                  <th className="p-3">Cash in Hand</th>
+                                  <th className="p-3 text-right">Anomalies</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 text-gray-700">
+                                {dbData.dailyClosings?.slice(0, 5).map(close => {
+                                  const m14 = close.mismatch14Filled !== 0 || close.mismatch14Empty !== 0;
+                                  const m19 = close.mismatch19Filled !== 0 || close.mismatch19Empty !== 0;
+                                  return (
+                                    <tr key={close.id} className="hover:bg-gray-50/50">
+                                      <td className="p-3 font-semibold">{new Date(close.closingDate).toLocaleDateString()}</td>
+                                      <td className="p-3 font-mono">F: {close.physical14Filled} | E: {close.physical14Empty}</td>
+                                      <td className="p-3 font-mono">F: {close.physical19Filled} | E: {close.physical19Empty}</td>
+                                      <td className="p-3 font-mono">₹{close.cashInHand?.toLocaleString()}</td>
+                                      <td className="p-3 text-right">
+                                        {m14 || m19 ? (
+                                          <span className="text-red-600 font-bold">Mismatch</span>
+                                        ) : (
+                                          <span className="text-green-600 font-medium">None</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {(!dbData.dailyClosings || dbData.dailyClosings.length === 0) && (
+                                  <tr>
+                                    <td colSpan="5" className="text-center text-gray-400 py-6">No EOD closing records found.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
                           </div>
+                        </div>
 
-                          <div className="flex flex-col gap-1 text-xs">
-                            <label className="font-semibold text-gray-700">Upload Godown Stock Image</label>
-                            <input 
-                              type="file" 
-                              accept="image/*"
-                              className="border border-[#E8EAF0] rounded p-1.5 text-xs outline-none bg-gray-50 cursor-pointer"
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setAuditorVerificationForm(prev => ({ ...prev, imageUrl: reader.result }));
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                            {auditorVerificationForm.imageUrl && (
-                              <img src={auditorVerificationForm.imageUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg border border-[#E8EAF0] mt-2" />
-                            )}
+                        {/* Account Ledger preview */}
+                        <div className="auditor-card">
+                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider">Account Ledger (Invoices)</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <thead>
+                                <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
+                                  <th className="p-3">Invoice No</th>
+                                  <th className="p-3">Date</th>
+                                  <th className="p-3">Customer Name</th>
+                                  <th className="p-3">Billed Qty</th>
+                                  <th className="p-3 text-right">Outstanding</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 text-gray-700">
+                                {dbData.invoices?.slice(0, 5).map(inv => {
+                                  const cust = dbData.customers?.find(c => c.id === inv.customerId) || { name: 'Direct Customer' };
+                                  return (
+                                    <tr key={inv.id} className="hover:bg-gray-50/50">
+                                      <td className="p-3 font-mono font-bold text-[#001F5B]">{inv.invoiceNumber}</td>
+                                      <td className="p-3">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
+                                      <td className="p-3 font-semibold">{inv.customerName || cust.name}</td>
+                                      <td className="p-3">{inv.quantity} Cyl</td>
+                                      <td className="p-3 text-right font-semibold text-red-600">₹{inv.balanceAmount || 0}</td>
+                                    </tr>
+                                  );
+                                })}
+                                {(!dbData.invoices || dbData.invoices.length === 0) && (
+                                  <tr>
+                                    <td colSpan="5" className="text-center text-gray-400 py-6">No ledger invoice records found.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
                           </div>
-
-                          <div className="flex flex-col gap-1 text-xs">
-                            <label className="font-semibold text-gray-700">Verification Notes / Mismatch Observations</label>
-                            <textarea 
-                              placeholder="e.g. Godown inspected, counts match expected, no discrepancies."
-                              className="border border-[#E8EAF0] rounded p-2 text-xs h-20 focus:border-[#F37022] outline-none"
-                              value={auditorVerificationForm.notes || ''}
-                              onChange={e => setAuditorVerificationForm(prev => ({ ...prev, notes: e.target.value }))}
-                            />
-                          </div>
-
-                          <button 
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="w-full py-2 bg-[#F37022] hover:bg-[#F37022]/90 text-white rounded text-xs font-bold transition mt-2 disabled:opacity-50"
-                          >
-                            {isSubmitting ? 'Uploading...' : 'Upload Image & Submit'}
-                          </button>
-                        </form>
+                        </div>
                       </div>
 
-                      {/* Verification Logs List */}
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm">
-                        <h3 className="text-sm font-bold text-[#02164F] mb-4">Past Auditor Verifications</h3>
-                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                          {dbData.auditorVerifications?.map(log => (
-                            <div key={log.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50 text-xs flex flex-col gap-2 shadow-sm">
-                              <div className="flex justify-between items-center">
-                                <span className="font-semibold text-gray-800">{new Date(log.verificationDate).toLocaleDateString()}</span>
-                                <span className="text-[10px] text-gray-400 font-mono">By {log.uploadedBy}</span>
-                              </div>
-                              <p className="text-gray-600 text-[11px] leading-tight">{log.notes || 'No notes added.'}</p>
-                              {log.imageUrl && (
-                                <div className="relative group cursor-pointer" onClick={() => window.open(log.imageUrl, '_blank')}>
-                                  <img src={log.imageUrl} alt="Verification" className="w-full h-24 object-cover rounded-lg border border-gray-100" />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold text-[10px] rounded-lg transition-all">Click to zoom</div>
+                      {/* Right side panel */}
+                      <div className="space-y-6">
+                        {/* Reports Center Panel */}
+                        <div className="auditor-card">
+                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider">Reports Center</h3>
+                          <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+                            Quickly access statements and details ledger books.
+                          </p>
+                          <div className="space-y-2">
+                            <button 
+                              onClick={() => { setActiveTab('reports'); setSelectedReportType('closings'); }}
+                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
+                            >
+                              <span>EOD Closings Log</span>
+                              <ChevronRight size={14} className="text-gray-400" />
+                            </button>
+                            <button 
+                              onClick={() => { setActiveTab('commercial'); }}
+                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
+                            >
+                              <span>Accounts Debts Ledger</span>
+                              <ChevronRight size={14} className="text-gray-400" />
+                            </button>
+                            <button 
+                              onClick={() => { setActiveTab('reports'); setSelectedReportType('expenses'); }}
+                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
+                            >
+                              <span>Expenses Log</span>
+                              <ChevronRight size={14} className="text-gray-400" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Uploads Panel */}
+                        <div className="auditor-card">
+                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider flex items-center justify-between">
+                            <span>Verification Uploads</span>
+                            <span className="text-[10px] bg-[#001F5B]/10 text-[#001F5B] px-2 py-0.5 rounded-full font-bold">
+                              {dbData.auditorVerifications?.length || 0} Total
+                            </span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mb-4 leading-relaxed font-semibold">
+                            Verification logs and stock image attachments.
+                          </p>
+
+                          <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                            {dbData.auditorVerifications?.slice(0, 3).map(log => (
+                              <div key={log.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50 text-[11px]">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="font-semibold text-gray-800">{new Date(log.verificationDate).toLocaleDateString()}</span>
+                                  <span className="text-gray-400 font-mono text-[9px]">By {log.uploadedBy}</span>
                                 </div>
-                              )}
-                              <button 
-                                onClick={() => triggerPrintJob('auditor_verification', log)}
-                                className="w-full py-1 text-[10px] text-gray-700 hover:text-white border border-[#E8EAF0] hover:bg-[#02164F] rounded transition font-bold mt-1"
-                              >
-                                Print Verification Report
-                              </button>
-                            </div>
-                          ))}
-                          {(!dbData.auditorVerifications || dbData.auditorVerifications.length === 0) && (
-                            <p className="text-center text-gray-400 py-6 text-xs">No verification logs recorded.</p>
-                          )}
+                                <p className="text-gray-600 line-clamp-2 leading-tight">{log.notes || 'No description notes added.'}</p>
+                              </div>
+                            ))}
+                            {(!dbData.auditorVerifications || dbData.auditorVerifications.length === 0) && (
+                              <p className="text-center text-gray-400 py-6 text-xs">No verification proofs uploaded yet.</p>
+                            )}
+                          </div>
+                          
+                          <button 
+                            onClick={() => setActiveTab('auditor_uploads')}
+                            className="w-full mt-4 py-2.5 bg-[#001F5B] hover:bg-[#001F5B]/90 text-white rounded text-xs font-bold transition text-center uppercase tracking-wider cursor-pointer"
+                          >
+                            Upload Verification Image
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -4123,19 +4788,19 @@ export default function DashboardClient({ initialData, user }) {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">1. Customer Creation Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Customer Profile Creation</h3>
                       <p className="text-xs text-gray-500 mt-1">Create verified customer profiles for domestic/commercial sales linkings.</p>
                     </div>
-                    <button onClick={() => setActiveTab('customer')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('customer')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
  
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">2. Domestic Refill Delivery Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Domestic Refill Entry</h3>
                       <p className="text-xs text-gray-500 mt-1">Log domestic 14.2 kg cylinder sales and empty return counts.</p>
                     </div>
                     <button
@@ -4149,15 +4814,15 @@ export default function DashboardClient({ initialData, user }) {
                         }));
                         setActiveTab('refill');
                       }}
-                      className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1"
+                      className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1"
                     >
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">3. Commercial Refill Delivery Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Commercial Refill Entry</h3>
                       <p className="text-xs text-gray-500 mt-1">Log commercial 19 kg sales, payments received, and credit rollovers.</p>
                     </div>
                     <button
@@ -4171,98 +4836,98 @@ export default function DashboardClient({ initialData, user }) {
                         }));
                         setActiveTab('refill');
                       }}
-                      className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1"
+                      className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1"
                     >
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">4. New Connection Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">New Connection (SBC / DBC)</h3>
                       <p className="text-xs text-gray-500 mt-1">Register new SBC/DBC cylinder connection contracts and deposits.</p>
                     </div>
-                    <button onClick={() => setActiveTab('connection')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('connection')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">5. Empty Return Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Empty Cylinder Return</h3>
                       <p className="text-xs text-gray-500 mt-1">Log cylinder returns from credit customers to reconcile balances.</p>
                     </div>
-                    <button onClick={() => setActiveTab('empty_return')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('empty_return')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">6. Truck Unload Entry Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Refinery Truck Unload Entry</h3>
                       <p className="text-xs text-gray-500 mt-1">Log arrival of refinery trucks with filled inventory and returns.</p>
                     </div>
-                    <button onClick={() => setActiveTab('load')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('load')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">7. Daily Closing stock Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Daily Closing Stock Count</h3>
                       <p className="text-xs text-gray-500 mt-1">Log physical EOD inventory stock count and cash in hand.</p>
                     </div>
-                    <button onClick={() => setActiveTab('closing')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('closing')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">8. Cylinder Incident damage Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Cylinder Incident / Damage Report</h3>
                       <p className="text-xs text-gray-500 mt-1">Log leakages, valve defects, or broken cylinders to isolate stock.</p>
                     </div>
-                    <button onClick={() => setActiveTab('incident')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('incident')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">9. Expense Entry Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Expense Entry</h3>
                       <p className="text-xs text-gray-500 mt-1">Log godown expenses, truck fuel, or daily staff labor wages.</p>
                     </div>
-                    <button onClick={() => setActiveTab('expense')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('expense')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">10. Customer Payment Form</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Customer Payment Entry</h3>
                       <p className="text-xs text-gray-500 mt-1">Record store credit and payment recoveries from commercial customers.</p>
                     </div>
-                    <button onClick={() => setActiveTab('payment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('payment')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">11. Custom Invoice Creation</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Custom Invoice Creation</h3>
                       <p className="text-xs text-gray-500 mt-1">Issue wholesale bills to commercial customers directly.</p>
                     </div>
-                    <button onClick={() => setActiveTab('invoice')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('invoice')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
- 
-                  <div className="bg-white border border-[#E8EAF0] p-5 rounded-xl hover:border-[#F37022] transition shadow-sm flex flex-col justify-between">
+  
+                  <div className="bg-white border border-[#D6DEE8] p-5 rounded-[4px] hover:border-[#F37022] transition shadow-none flex flex-col justify-between">
                     <div>
-                      <h3 className="font-bold text-[#02164F] text-sm">12. Direct Stock Adjustment</h3>
+                      <h3 className="font-bold text-[#001F5B] text-sm uppercase tracking-wide">Direct Stock Adjustment</h3>
                       <p className="text-xs text-gray-500 mt-1">Manually adjust inventory filled/empty stocks (Admin only).</p>
                     </div>
-                    <button onClick={() => setActiveTab('stock_adjustment')} className="mt-4 px-3 py-1.5 bg-[#02164F] hover:bg-[#02164F]/90 text-white rounded text-xs font-semibold self-start flex items-center gap-1">
+                    <button onClick={() => setActiveTab('stock_adjustment')} className="mt-4 px-3 py-1.5 bg-[#001F5B] hover:bg-[#00143A] text-white rounded-[4px] text-xs font-semibold self-start flex items-center gap-1">
                       Open Form &rarr;
                     </button>
                   </div>
@@ -4271,7 +4936,7 @@ export default function DashboardClient({ initialData, user }) {
             )}
 
             {/* --- TAB 3: COMMERCIAL CREDIT LEDGER (ADMIN / AUDITOR) --- */}
-            {activeTab === 'commercial' && (
+            {activeTab === 'commercial' && (isAdmin || isAuditor) && (
               <div>
                 <div className="page-header mb-6 flex justify-between items-center">
                   <div>
@@ -4327,7 +4992,7 @@ export default function DashboardClient({ initialData, user }) {
             )}
 
             {/* --- TAB 4: REPORTS & AUDITS --- */}
-            {activeTab === 'reports' && (
+            {activeTab === 'reports' && (isAdmin || isAuditor) && (
               <div>
                 <div className="page-header mb-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div>
@@ -4807,16 +5472,242 @@ export default function DashboardClient({ initialData, user }) {
             )}
 
             {/* --- TAB 5: DAILY CLOSINGS HISTORY --- */}
-            {activeTab === 'closing' && (
+            {activeTab === 'closing' && (isAdmin || isAuditor) && (
               <div>
                 <div className="page-header mb-6">
-                  <h1 className="text-2xl font-bold text-[#02164F]">Daily Closings Inventory Audits</h1>
-                  <p className="text-sm text-gray-500">Historical daily closures logs, physical counts, expected balances, and discrepancies</p>
+                  <h1 className="text-2xl font-bold text-[#02164F]">
+                    {isAuditor ? "Daily Closing Audit & Verification" : "Daily Closings Inventory Audits"}
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    {isAuditor 
+                      ? "Verify system expected stocks against physical godown counts and submit EOD verification" 
+                      : "Historical daily closures logs, physical counts, expected balances, and discrepancies"}
+                  </p>
                 </div>
 
-                <div className="bg-white border border-[#E8EAF0] rounded-xl shadow-sm overflow-x-auto">
+                {isAuditor && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 auditor-shell">
+                    {/* Left Column: System Expected Summary */}
+                    <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5 shadow-sm text-xs">
+                      <div className="border-b border-[#C8D2E0] pb-3 mb-4">
+                        <h3 className="text-sm font-bold text-[#001F5B] uppercase tracking-wider">System Expected Summary</h3>
+                        <p className="text-[11px] text-gray-500">Active database balances computed from all transactions up to today</p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Domestic 14.2 kg */}
+                        <div className="p-3 bg-gray-50 border border-[#C8D2E0] rounded-[3px]">
+                          <div className="text-xs font-bold text-gray-700 uppercase mb-2">Domestic LPG (14.2 kg)</div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase">Filled Stock</div>
+                              <div className="text-lg font-bold text-[#001F5B]">
+                                {dbData.inventory?.domestic?.filledStock || 0} <span className="text-xs font-normal text-gray-500">cyls</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase">Empty Stock</div>
+                              <div className="text-lg font-bold text-[#001F5B]">
+                                {dbData.inventory?.domestic?.emptyStock || 0} <span className="text-xs font-normal text-gray-500">cyls</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Commercial 19 kg */}
+                        <div className="p-3 bg-gray-50 border border-[#C8D2E0] rounded-[3px]">
+                          <div className="text-xs font-bold text-gray-700 uppercase mb-2">Commercial LPG (19 kg)</div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase">Filled Stock</div>
+                              <div className="text-lg font-bold text-[#001F5B]">
+                                {dbData.inventory?.commercial?.filledStock || 0} <span className="text-xs font-normal text-gray-500">cyls</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-500 uppercase">Empty Stock</div>
+                              <div className="text-lg font-bold text-[#001F5B]">
+                                {dbData.inventory?.commercial?.emptyStock || 0} <span className="text-xs font-normal text-gray-500">cyls</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expected Treasury Cash */}
+                        <div className="p-3 bg-[#FFF4E8] border border-[#FFD3B4] rounded-[3px]">
+                          <div className="text-xs font-bold text-[#A75D00] uppercase mb-1">Expected Treasury Cash</div>
+                          <div className="text-2xl font-bold text-[#E65F00]">
+                            ₹{((dbData.kpis?.todayCashCollection || 0) - (dbData.kpis?.staffPaymentsToday || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="text-[10px] text-[#A75D00] mt-1">
+                            Cash Collection (₹{(dbData.kpis?.todayCashCollection || 0).toLocaleString()}) - Staff Payments (₹{(dbData.kpis?.staffPaymentsToday || 0).toLocaleString()})
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Physical Count Form */}
+                    <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5 shadow-sm">
+                      <div className="border-b border-[#C8D2E0] pb-3 mb-4">
+                        <h3 className="text-sm font-bold text-[#001F5B] uppercase tracking-wider">Physical Count Entry</h3>
+                        <p className="text-[11px] text-gray-500">Perform end-of-day physical stock checks and reconcile mismatches</p>
+                      </div>
+
+                      <form onSubmit={handleAuditorClosingSubmit} className="space-y-4 text-xs">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1 col-span-2">
+                            <label className="font-semibold text-gray-700">Verification Date*</label>
+                            <input 
+                              type="date" 
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none bg-white text-gray-800"
+                              value={auditorClosingForm.verificationDate} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, verificationDate: e.target.value }))}
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Physical 14.2 kg Filled*</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.physical14Filled} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, physical14Filled: parseInt(e.target.value) || 0 }))}
+                            />
+                            <span className={`text-[10px] mt-0.5 ${getMismatchClass(auditorClosingForm.physical14Filled, dbData.inventory?.domestic?.filledStock || 0)}`}>
+                              {getMismatchLabel(auditorClosingForm.physical14Filled, dbData.inventory?.domestic?.filledStock || 0)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Physical 14.2 kg Empty*</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.physical14Empty} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, physical14Empty: parseInt(e.target.value) || 0 }))}
+                            />
+                            <span className={`text-[10px] mt-0.5 ${getMismatchClass(auditorClosingForm.physical14Empty, dbData.inventory?.domestic?.emptyStock || 0)}`}>
+                              {getMismatchLabel(auditorClosingForm.physical14Empty, dbData.inventory?.domestic?.emptyStock || 0)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Physical 19 kg Filled*</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.physical19Filled} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, physical19Filled: parseInt(e.target.value) || 0 }))}
+                            />
+                            <span className={`text-[10px] mt-0.5 ${getMismatchClass(auditorClosingForm.physical19Filled, dbData.inventory?.commercial?.filledStock || 0)}`}>
+                              {getMismatchLabel(auditorClosingForm.physical19Filled, dbData.inventory?.commercial?.filledStock || 0)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="font-semibold text-gray-700">Physical 19 kg Empty*</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.physical19Empty} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, physical19Empty: parseInt(e.target.value) || 0 }))}
+                            />
+                            <span className={`text-[10px] mt-0.5 ${getMismatchClass(auditorClosingForm.physical19Empty, dbData.inventory?.commercial?.emptyStock || 0)}`}>
+                              {getMismatchLabel(auditorClosingForm.physical19Empty, dbData.inventory?.commercial?.emptyStock || 0)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1 col-span-2">
+                            <label className="font-semibold text-gray-700">Physical Cash Counted (INR)*</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              required 
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.physicalCash} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, physicalCash: parseFloat(e.target.value) || 0 }))}
+                            />
+                            <span className={`text-[10px] mt-0.5 ${getMismatchClass(auditorClosingForm.physicalCash, (dbData.kpis?.todayCashCollection || 0) - (dbData.kpis?.staffPaymentsToday || 0))}`}>
+                              {getMismatchLabel(auditorClosingForm.physicalCash, (dbData.kpis?.todayCashCollection || 0) - (dbData.kpis?.staffPaymentsToday || 0))}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-col gap-1 col-span-2">
+                            <label className="font-semibold text-gray-700">Godown Photo (Optional)</label>
+                            <div className="flex gap-2 items-center">
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                className="hidden" 
+                                id="auditor-godown-photo-upload"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setAuditorClosingForm(prev => ({ ...prev, imageUrl: reader.result }));
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <label 
+                                htmlFor="auditor-godown-photo-upload"
+                                className="border border-dashed border-[#C8D2E0] rounded-[3px] p-2 text-center cursor-pointer hover:border-[#F37022] flex-1 text-gray-500 hover:text-[#001F5B] transition text-xs"
+                              >
+                                {auditorClosingForm.imageUrl ? 'Photo Selected (Change)' : 'Choose Godown Verification Image'}
+                              </label>
+                              {auditorClosingForm.imageUrl && (
+                                <div className="relative w-10 h-10 border border-[#C8D2E0] rounded-[3px] overflow-hidden font-sans">
+                                  <img src={auditorClosingForm.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setAuditorClosingForm(prev => ({ ...prev, imageUrl: '' }))}
+                                    className="absolute inset-0 bg-black bg-opacity-50 text-white flex items-center justify-center text-[8px] font-bold"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1 col-span-2">
+                            <label className="font-semibold text-gray-700">Discrepancy Justification / Remarks</label>
+                            <textarea 
+                              rows="3"
+                              placeholder="Explain any physical count or cash mismatches here..."
+                              className="border border-[#C8D2E0] rounded-[3px] p-2 text-sm focus:border-[#F37022] outline-none text-gray-800"
+                              value={auditorClosingForm.mismatchReason} 
+                              onChange={e => setAuditorClosingForm(prev => ({ ...prev, mismatchReason: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+
+                        <button 
+                          type="submit" 
+                          disabled={isSubmitting}
+                          className="w-full bg-[#001F5B] hover:bg-[#001030] text-white font-bold py-2.5 rounded-[4px] transition flex items-center justify-center gap-2 text-xs"
+                        >
+                          {isSubmitting ? 'Submitting Verification...' : 'Submit EOD Verification'}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white border border-[#C8D2E0] rounded-[4px] shadow-sm overflow-x-auto">
                   <table className="min-w-full text-xs text-left">
-                    <thead className="bg-gray-50 text-gray-700 font-bold uppercase border-b border-[#E8EAF0]">
+                    <thead className="bg-gray-50 text-gray-700 font-bold uppercase border-b border-[#C8D2E0]">
                       <tr>
                         <th className="px-4 py-3">Closing Date</th>
                         <th className="px-4 py-3">Physical counts (14.2 kg)</th>
@@ -4911,7 +5802,7 @@ export default function DashboardClient({ initialData, user }) {
             )}
 
             {/* --- TAB 7: DATA MANAGEMENT (ADMIN ONLY) --- */}
-            {activeTab === 'data_management' && isAdmin && (
+            {activeTab === 'archive' && isAdmin && (
               <div>
                 <div className="page-header mb-6">
                   <h1 className="text-2xl font-bold text-[#02164F]">Data Management & System Audits</h1>
@@ -5131,7 +6022,10 @@ export default function DashboardClient({ initialData, user }) {
           </div>
         </>
       )}
-      </main>
+            </>
+          )}
+        </main>
+      </div>
 
       {/* VERIFY QUEUE APPROVAL EDIT POPUP MODAL OVERLAY */}
       {verifyingItem && (
@@ -5544,6 +6438,96 @@ export default function DashboardClient({ initialData, user }) {
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-semibold hover:bg-red-700 transition active:scale-95 disabled:opacity-50"
               >
                 {isSubmitting ? 'Purging...' : 'Confirm Purge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation Menu */}
+      <nav className="mobile-bottom-nav print:hidden">
+        {bottomNavLinks.map((link) => {
+          const Icon = link.icon;
+          const isActive = activeTab === link.tab;
+          const isDisabled = link.requiresInit && !dbData.isInitialized;
+          return (
+            <div
+              key={link.tab}
+              onClick={() => {
+                if (link.tab === 'more') {
+                  setShowMoreMenu(true);
+                } else if (!isDisabled) {
+                  setActiveTab(link.tab);
+                  setActiveForm(null);
+                }
+              }}
+              className={`mobile-nav-item ${isActive || (link.tab === 'more' && showMoreMenu) ? 'active' : ''} ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <Icon className="w-5 h-5" />
+              <span>{link.label}</span>
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Mobile More Menu Overlay */}
+      {showMoreMenu && (
+        <div className="fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm z-[999] flex items-end justify-center" onClick={() => setShowMoreMenu(false)}>
+          <div className="bg-white w-full rounded-t-2xl border-t border-[#C8D2E0] p-6 space-y-4 max-w-md font-sans" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-[#C8D2E0] pb-3">
+              <h3 className="text-sm font-bold text-[#001F5B] uppercase tracking-wider">More Operations</h3>
+              <button onClick={() => setShowMoreMenu(false)} className="text-gray-400 hover:text-gray-600 font-bold text-sm">Close</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 py-2">
+              {/* Render the remaining 5th menu items based on role */}
+              {isEmployee && (
+                <button
+                  onClick={() => {
+                    setActiveTab('my_entries');
+                    setActiveForm(null);
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
+                >
+                  <FileText className="w-6 h-6 text-[#001F5B]" />
+                  <span>My Entries</span>
+                </button>
+              )}
+              {isAuditor && (
+                <button
+                  onClick={() => {
+                    setActiveTab('auditor_uploads');
+                    setActiveForm(null);
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
+                >
+                  <Database className="w-6 h-6 text-[#001F5B]" />
+                  <span>Auditor Uploads</span>
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setActiveTab('closing');
+                    setActiveForm(null);
+                    setShowMoreMenu(false);
+                  }}
+                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
+                >
+                  <Lock className="w-6 h-6 text-[#001F5B]" />
+                  <span>Daily Closing</span>
+                </button>
+              )}
+
+              {/* General Direct /logout trigger */}
+              <button
+                onClick={() => signOut({ callbackUrl: '/sign-in' })}
+                className="flex flex-col items-center justify-center p-3 border border-red-200 bg-red-50 hover:bg-red-100 rounded-[4px] text-xs font-bold text-red-600 gap-2"
+              >
+                <LogOut className="w-6 h-6 text-red-600" />
+                <span>Logout Session</span>
               </button>
             </div>
           </div>

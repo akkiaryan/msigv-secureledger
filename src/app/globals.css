@@ -7,9 +7,9 @@
 
 :root {
   /* Color Palette - Sarkari style guide */
-  --bg-main: #F8FAFC;      
+  --bg-main: #F5F7FA;      
   --bg-white: #FFFFFF;     
-  --border-clean: #D7DEE8; 
+  --border-clean: #C8D2E0; 
   
   --text-main: #0F172A;    
   --text-muted: #64748B;   
@@ -24,8 +24,8 @@
   --color-danger: #DC2626;  
 
   --transition-fast: all 0.15s ease-in-out;
-  --shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-subtle: none;
+  --shadow-card: none;
 }
 
 /* Custom Reset and Base Styles */
@@ -57,13 +57,13 @@ body {
   width: 260px;
   background: var(--bg-white);
   border-right: 1px solid var(--border-clean);
-  padding: 2rem 1.25rem;
+  padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
   position: fixed;
-  height: 100vh;
+  height: calc(100vh - 72px);
   left: 0;
-  top: 0;
+  top: 72px;
   z-index: 100;
   transition: var(--transition-fast);
 }
@@ -120,25 +120,28 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
+  padding: 0 0.85rem;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: 4px;
   transition: var(--transition-fast);
   cursor: pointer;
+  height: 44px;
 }
 
 .nav-item:hover {
   color: var(--text-main);
-  background: #F3F4F6;
+  background: #F1F5F9;
 }
 
 .nav-item.active {
   color: var(--brand-navy);
-  background: rgba(2, 22, 79, 0.06);
-  font-weight: 600;
+  background: #FFF4E8;
+  font-weight: 700;
+  border-left: 4px solid var(--brand-orange);
+  border-radius: 4px;
 }
 
 .nav-icon {
@@ -195,10 +198,11 @@ body {
 .app-content {
   flex: 1;
   margin-left: 260px;
-  padding: 32px;
-  max-width: 1280px;
+  padding: 24px 32px;
+  max-width: 1120px;
   width: calc(100% - 260px);
   margin-right: auto;
+  margin-top: 96px; /* 72px header + 24px margin */
 }
 
 /* ----------------------------------------------------
@@ -525,23 +529,292 @@ body {
   margin-top: 1.25rem;
 }
 
-@media (max-width: 1024px) {
-  .layout-split {
-    grid-template-columns: 1fr;
-  }
-  .app-sidebar {
-    width: 72px;
-    padding: 2rem 0.25rem;
-    align-items: center;
-  }
-  .brand-title, .user-details, .sidebar-footer, .nav-text, .search-container {
-    display: none;
-  }
-  .app-content {
-    margin-left: 72px;
-    width: calc(100% - 72px);
-    padding: 1.5rem 1.75rem;
-  }
+/* ----------------------------------------------------
+   Sarkari / IndianOil Header Styling
+   ---------------------------------------------------- */
+/* ----------------------------------------------------
+   Sarkari / IndianOil Portal Header Styling
+   ---------------------------------------------------- */
+.portal-header {
+  height: 72px;
+  display: grid;
+  grid-template-columns: 280px 1fr 460px;
+  align-items: center;
+  background: #FFFFFF;
+  border-bottom: 1px solid #C8D2E0;
+  position: relative;
+  z-index: 100;
+}
+
+.portal-header__brand {
+  padding-left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-header__title {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-header__title .header-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--brand-navy);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.portal-header__title .header-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 1px 0 0 0;
+}
+
+.portal-header__meta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-right: 24px;
+}
+
+.portal-header__meta .header-info-box {
+  height: 40px;
+  border: 1px solid #C8D2E0;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  background: var(--bg-white);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.portal-header__meta .header-info-box.sap span {
+  color: var(--brand-orange);
+}
+
+.portal-header__meta .header-info-box.date span {
+  color: var(--brand-navy);
+}
+
+/* ----------------------------------------------------
+   Sarkari / Government Data Entry UI Styles
+   ---------------------------------------------------- */
+.info-banner {
+  border: 1px solid #AFC7E8;
+  background: #EFF6FF;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.form-panel {
+  background: #FFFFFF;
+  border: 1px solid var(--border-clean);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.form-panel-header {
+  height: auto;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-clean);
+  background: #F8FAFC;
+}
+
+.section-header {
+  background: #F1F5F9;
+  border-top: 1px solid var(--border-clean);
+  border-bottom: 1px solid var(--border-clean);
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--brand-navy);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  padding: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.input-field {
+  height: 42px;
+  border: 1px solid var(--border-clean);
+  border-radius: 4px;
+  padding: 0 12px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg-white);
+  color: var(--text-main);
+  transition: var(--transition-fast);
+  width: 100%;
+}
+
+.input-field:focus {
+  border-color: var(--brand-orange);
+  box-shadow: 0 0 0 1px var(--brand-orange);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border-clean);
+  background: #F8FAFC;
+}
+
+.btn-cancel-sarkari {
+  height: 42px;
+  padding: 0 20px;
+  background: #FFFFFF;
+  border: 1px solid var(--brand-navy);
+  color: var(--brand-navy);
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.btn-cancel-sarkari:hover {
+  background: #F1F5F9;
+}
+
+.btn-save-sarkari {
+  height: 42px;
+  padding: 0 20px;
+  background: var(--brand-orange);
+  border: 1px solid var(--brand-orange);
+  color: #FFFFFF;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.btn-save-sarkari:hover {
+  background: #D9540C;
+  border-color: #D9540C;
+}
+
+/* ----------------------------------------------------
+   Role Scoped Shells and Components
+   ---------------------------------------------------- */
+.admin-card, .employee-card, .auditor-card, .auditor-shell .audit-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border-clean);
+  border-radius: 4px;
+  padding: 1.5rem;
+  box-shadow: none;
+}
+
+.admin-form-panel, .employee-form-panel, .auditor-form-panel, .auditor-shell .verification-form {
+  background: #FFFFFF;
+  border: 1px solid var(--border-clean);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.admin-shell .opening-stock-setup, .admin-shell .setup-form-panel {
+  border: 1px solid var(--border-clean);
+  border-radius: 4px;
+  background: #FFFFFF;
+  padding: 24px;
+}
+
+.auditor-shell .audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.employee-init-state {
+  max-width: 900px;
+  margin: 48px auto;
+  padding: 0 24px;
+}
+
+.official-alert-panel {
+  border: 1px solid #C8D2E0;
+  border-left: 4px solid #F37022;
+  background: #FFFFFF;
+  border-radius: 4px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* ----------------------------------------------------
+   Common Layout Spacing System
+   ---------------------------------------------------- */
+.app-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: calc(100vh - 72px);
+}
+
+.app-sidebar {
+  width: 260px;
+  border-right: 1px solid #C8D2E0;
+  background: #FFFFFF;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  background: #F5F7FA;
+  min-width: 0;
+}
+
+.app-content {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 32px;
 }
 
 /* Mobile Bottom Navigation Menu */
@@ -576,34 +849,319 @@ body {
   color: var(--brand-navy);
 }
 
-@media (max-width: 640px) {
-  .app-sidebar {
+/* Responsive Breakpoints & MSIGV App Layout */
+.msigv-app {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+  width: 100%;
+  background: #F5F7FA;
+}
+
+.msigv-sidebar {
+  grid-column: 1;
+  width: 260px;
+  min-width: 260px;
+  background: #FFFFFF;
+  border-right: 1px solid #C8D2E0;
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.msigv-main {
+  grid-column: 2;
+  min-width: 0;
+  width: 100%;
+  background: #F5F7FA;
+  display: flex;
+  flex-direction: column;
+}
+
+.msigv-header {
+  height: 72px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto;
+  align-items: center;
+  background: #FFFFFF;
+  border-bottom: 1px solid #C8D2E0;
+  padding: 0 24px;
+  gap: 24px;
+}
+
+.msigv-content {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  flex: 1;
+}
+
+/* Sidebar Brand Block */
+.sidebar-brand {
+  height: 92px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #C8D2E0;
+  flex-shrink: 0;
+}
+
+/* Sidebar Navigation Wrapper */
+.sidebar-nav {
+  flex: 1;
+  padding: 18px 12px;
+  overflow-y: auto;
+}
+
+/* Sidebar Menu Items */
+.msigv-sidebar .nav-item {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  border-radius: 4px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #475569;
+}
+
+.msigv-sidebar .nav-item:hover {
+  background: #F8FAFC;
+}
+
+.msigv-sidebar .nav-item.active {
+  background: #FFF4E8;
+  border-left: 4px solid #F37022;
+  color: #001F5B;
+  font-weight: 700;
+}
+
+.msigv-sidebar .sidebar-heading {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #001F5B;
+  margin: 18px 18px 8px;
+}
+
+/* Sidebar Footer Area */
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-top: 1px solid #C8D2E0;
+  background: #FFFFFF;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.sidebar-user p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.sidebar-user span {
+  font-size: 12px;
+  color: #64748B;
+}
+
+.logout-button {
+  width: 100%;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #FCA5A5;
+  border-radius: 4px;
+  background: #FFFFFF;
+  color: #DC2626;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.logout-button:hover {
+  background: #FEF2F2;
+}
+
+/* Header Text Center & Meta Layout */
+.header-title {
+  min-width: 0;
+  text-align: center;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.meta-box {
+  height: 40px;
+  min-width: 130px;
+  border: 1px solid #C8D2E0;
+  border-radius: 4px;
+  background: #FFFFFF;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.meta-box.sap span {
+  color: #F37022;
+}
+
+.meta-box.date span {
+  color: #001F5B;
+}
+
+/* System Not Initialized Alerts */
+.employee-init-state {
+  max-width: 760px;
+  margin: 64px auto 0;
+}
+
+.system-alert-panel {
+  width: 100%;
+  border: 1px solid #C8D2E0;
+  border-left: 5px solid #F37022;
+  background: #FFFFFF;
+  border-radius: 4px;
+  padding: 28px 32px;
+  text-align: center;
+}
+
+.system-alert-panel h2 {
+  font-size: 24px;
+  color: #001F5B;
+  margin-bottom: 10px;
+}
+
+.system-alert-panel p {
+  font-size: 15px;
+  color: #475569;
+  max-width: 560px;
+  margin: 0 auto 20px;
+  line-height: 1.6;
+}
+
+/* Setup Page layout rules */
+.setup-page {
+  max-width: 1050px;
+  margin: 0 auto;
+}
+
+.setup-info-banner {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.setup-form-panel {
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .msigv-app {
+    display: block;
+  }
+
+  .msigv-sidebar {
     display: none;
   }
-  .app-content {
-    margin-left: 0;
-    width: 100%;
-    padding: 1.25rem 1rem 5rem 1rem;
+
+  .msigv-header {
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 16px;
+    gap: 10px;
   }
+
+  .header-title {
+    text-align: left;
+  }
+
+  .header-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .meta-box {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .msigv-content {
+    padding: 16px;
+    max-width: 100%;
+  }
+
   .mobile-bottom-nav {
     display: grid;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .system-alert-panel {
+    padding: 22px 18px;
+  }
+
+  /* Auditor EOD Sticky Bottom Submit Button */
+  .auditor-verification-panel .form-actions-container {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    padding: 12px 16px;
+    border-top: 1px solid #C8D2E0;
+    margin: 0 -16px -16px -16px;
+    z-index: 10;
   }
 }
 
 /* Print Utilities */
 @media print {
   /* Hide all dashboard chrome */
-  body, html, .app-container, .app-sidebar, .mobile-bottom-nav, .top-bar, button, .topbar-actions, .search-container, nav, aside {
+  body, html, .msigv-app, .msigv-sidebar, .msigv-header, .mobile-bottom-nav, button, nav, aside {
     background: white !important;
     box-shadow: none !important;
   }
   
-  .app-sidebar, .mobile-bottom-nav, .top-bar, button, .sidebar-nav, .sidebar-footer {
+  .msigv-sidebar, .msigv-header, .mobile-bottom-nav, button, nav, aside {
     display: none !important;
   }
   
-  .app-content {
-    margin-left: 0 !important;
+  .msigv-content {
+    margin: 0 !important;
     width: 100% !important;
     padding: 0 !important;
   }
@@ -626,4 +1184,3 @@ body {
     color: black !important;
   }
 }
-

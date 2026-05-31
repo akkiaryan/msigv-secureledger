@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "MSIGV SecureLedger - LPG Operations & Anti-Theft Monitor",
-  description: "Internal operations ledger, stock tracking, and daily audit system for Maa Santoshi Indane Gramin Vitrak.",
+  title: "MSIGV SecureLedger",
+  description: "Maa Santoshi Indane Gramin Vitrak LPG Distributor Portal",
 };
 
 export default function RootLayout({ children }) {
