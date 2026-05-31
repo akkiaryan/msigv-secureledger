@@ -272,31 +272,6 @@ graph TD
    npm run dev
    ```
 
----
-
-## Environment Variables
-
-Ensure the following variables are configured in `.env.local` for development and Vercel Settings for production:
-
-```ini
-# Primary database connection string for Prisma operations
-DATABASE_URL="postgresql://neondb_owner:npg_z8ZBSDLmQYw2@ep-bold-king-apdsh4xa-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-
-# Direct connection string for migrations (bypasses pooling layers)
-DIRECT_URL="postgresql://neondb_owner:npg_z8ZBSDLmQYw2@ep-bold-king-apdsh4xa-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require"
-
-# Random 32-character string for NextAuth session encryption
-AUTH_SECRET="msigv-operations-secure-ledger-secret-717"
-
-# Base URL mapping for authentication routing
-NEXTAUTH_URL="http://localhost:3000"
-
-# Application deployment mode environment flag
-NODE_ENV="development"
-```
-
----
-
 ## Development Workflow
 
 We follow a strict development branch workflow:
