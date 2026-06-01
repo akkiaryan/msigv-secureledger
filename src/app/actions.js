@@ -525,7 +525,7 @@ export async function submitLoad(data) {
 
 const DeliverySchema = z.object({
   deliveryDate: z.string().min(1, "Date is required"),
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().min(1, "Customer name is required"),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -977,7 +977,7 @@ export async function submitConnection(data) {
 // 7. Create Invoice (ADMIN / MANAGER / ACCOUNTANT)
 // ----------------------------------------------------
 const InvoiceSchema = z.object({
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().min(1, "Customer name is required"),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -1233,7 +1233,7 @@ const IncidentSchema = z.object({
   quantity: z.number().int().nonnegative().default(0),
   regulatorSerialNumber: z.string().optional(),
   reportedBy: z.string().optional(),
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().optional(),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -1428,7 +1428,7 @@ export async function sendInvoiceReminder(id) {
 // 13. Empty returns (All roles)
 // ----------------------------------------------------
 const EmptyReturnSchema = z.object({
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().min(1, "Customer name is required"),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -1550,7 +1550,7 @@ export async function submitEmptyReturn(data) {
 // 14. Customer Payments (All roles)
 // ----------------------------------------------------
 const PaymentSchema = z.object({
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().min(1, "Customer name is required"),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -2239,7 +2239,7 @@ export async function createCommercialCustomer(data) {
 const RegulatorReturnSchema = z.object({
   serialNumber: z.string().min(1, "Serial Number is required"),
   returnDate: z.string().min(1, "Return date is required"),
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().optional(),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
@@ -2283,7 +2283,7 @@ const HosePipeTransactionSchema = z.object({
   type: z.enum(['SALE', 'RETURN']),
   quantity: z.number().int().positive(),
   txDate: z.string().min(1, "Date is required"),
-  customerId: z.string().optional(),
+  customerId: z.string().nullable().optional(),
   customerName: z.string().optional(),
   consumerNumber: z.string().optional(),
   mobileNumber: z.string().optional(),
