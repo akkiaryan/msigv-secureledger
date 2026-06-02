@@ -3884,489 +3884,426 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
                 {/* ========================================================================= */}
                 {/* ADMIN / MANAGER DASHBOARD VIEW */}
                 {/* ========================================================================= */}
-                {isAdmin && (
-                  <div>
-                    {/* Stock Mismatch Alarm */}
-                    {dbData.dailyClosings?.[0] && (
-                      (dbData.dailyClosings[0].mismatch14Filled !== 0 || 
-                       dbData.dailyClosings[0].mismatch14Empty !== 0) && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 items-center mb-6 text-red-800 text-sm">
-                          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 animate-bounce" />
+                {isAdmin && (() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  // 14.2 kg Calculations
+                  const refillDelivered14 = dbData.deliveries
+                    ?.filter(d => new Date(d.deliveryDate) >= today && d.verificationStatus === 'APPROVED')
+                    ?.reduce((sum, d) => {
+                      const item = d.deliveryItems?.find(di => di.cylinderType === 'DOMESTIC_14_2');
+                      return sum + (item ? item.quantityDelivered : 0);
+                    }, 0) || 0;
+
+                  const loadReceived14 = dbData.loads
+                    ?.filter(l => new Date(l.arrivalDate) >= today)
+                    ?.reduce((sum, l) => {
+                      const item = l.loadItems?.find(li => li.cylinderType === 'DOMESTIC_14_2');
+                      return sum + (item ? item.filledReceived : 0);
+                    }, 0) || 0;
+
+                  const damaged14 = dbData.incidents
+                    ?.filter(i => new Date(i.incidentDate) >= today && i.verificationStatus === 'APPROVED' && i.cylinderType === 'DOMESTIC_14_2')
+                    ?.reduce((sum, i) => sum + i.quantity, 0) || 0;
+
+                  const closingFilled14 = dbData.inventory?.domestic?.filledStock || 0;
+                  const openingFilled14 = closingFilled14 + refillDelivered14 - loadReceived14 + damaged14;
+
+                  // 19 kg Calculations
+                  const refillDelivered19 = dbData.deliveries
+                    ?.filter(d => new Date(d.deliveryDate) >= today && d.verificationStatus === 'APPROVED')
+                    ?.reduce((sum, d) => {
+                      const item = d.deliveryItems?.find(di => di.cylinderType === 'COMMERCIAL_19');
+                      return sum + (item ? item.quantityDelivered : 0);
+                    }, 0) || 0;
+
+                  const loadReceived19 = dbData.loads
+                    ?.filter(l => new Date(l.arrivalDate) >= today)
+                    ?.reduce((sum, l) => {
+                      const item = l.loadItems?.find(li => li.cylinderType === 'COMMERCIAL_19');
+                      return sum + (item ? item.filledReceived : 0);
+                    }, 0) || 0;
+
+                  const damaged19 = dbData.incidents
+                    ?.filter(i => new Date(i.incidentDate) >= today && i.verificationStatus === 'APPROVED' && i.cylinderType === 'COMMERCIAL_19')
+                    ?.reduce((sum, i) => sum + i.quantity, 0) || 0;
+
+                  const closingFilled19 = dbData.inventory?.commercial?.filledStock || 0;
+                  const openingFilled19 = closingFilled19 + refillDelivered19 - loadReceived19 + damaged19;
+
+                  return (
+                    <div className="space-y-6 animate-fade-in">
+                      {/* Stock Mismatch Alarm */}
+                      {dbData.dailyClosings?.[0] && (
+                        (dbData.dailyClosings[0].mismatch14Filled !== 0 || 
+                         dbData.dailyClosings[0].mismatch14Empty !== 0) && (
+                          <div className="bg-red-50 border border-red-200 rounded-[4px] p-4 flex gap-3 items-center mb-6 text-red-800 text-sm">
+                            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 animate-bounce" />
+                            <div>
+                              <strong>EOD Stock Mismatch Detected:</strong> Physical closing counts ({new Date(dbData.dailyClosings[0].closingDate).toLocaleDateString()}) mismatch with Expected ledger balances!
+                              <span className="ml-1 text-xs text-red-600 block">Domestic Filled Mismatch: {dbData.dailyClosings[0].mismatch14Filled} | Domestic Empty Mismatch: {dbData.dailyClosings[0].mismatch14Empty}</span>
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      {/* Storage Capacity Guardrail */}
+                      <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-4 shadow-none">
+                        <div className="flex justify-between items-center text-xs font-bold text-[#001F5B] mb-1.5">
+                          <span>Godown Storage Capacity Density (6,000 kg Limit)</span>
+                          <span>{dbData.kpis?.totalLpgWeight?.toLocaleString() || 0} kg stored / 6,000 kg</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-2 rounded-[4px] overflow-hidden">
+                          <div 
+                            className={`h-full rounded-[4px] transition-all ${
+                              dbData.kpis?.totalLpgWeight > 5500 ? 'bg-red-600' : (dbData.kpis?.totalLpgWeight > 4500 ? 'bg-yellow-500' : 'bg-[#001F5B]')
+                            }`} 
+                            style={{ width: `${Math.min(100, ((dbData.kpis?.totalLpgWeight || 0) / 6000) * 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Active Load Cycle Banner */}
+                      {dbData.activeLoadCycle && (
+                        <div className="bg-orange-50 border border-[#F37022]/20 rounded-[4px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-none">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-[#F37022]/10 rounded-[4px] text-[#F37022]">
+                              <Database className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-[#001F5B]">Active Load Cycle: #{dbData.activeLoadCycle.loadNumber}</h4>
+                                <span className="bg-[#F37022]/10 text-[#F37022] text-[10px] font-semibold px-2 py-0.5 rounded-[4px] capitalize">
+                                  {dbData.activeLoadCycle.loadType.toLowerCase()} Load
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Started: {new Date(dbData.activeLoadCycle.loadDate).toLocaleString()} | Cylinders Received: {dbData.activeLoadCycle.cylindersReceived}
+                              </p>
+                              <div className="flex gap-4 mt-2 text-xs text-gray-600 font-medium">
+                                <span>Deliveries Completed: <strong className="text-[#001F5B]">{dbData.activeLoadCycle.deliveriesCompleted || 0}</strong></span>
+                                <span>Empty Returns Logged: <strong className="text-[#001F5B]">{dbData.activeLoadCycle.emptyReturns || 0}</strong></span>
+                              </div>
+                            </div>
+                          </div>
                           <div>
-                            <strong>EOD Stock Mismatch Detected:</strong> Physical closing counts ({new Date(dbData.dailyClosings[0].closingDate).toLocaleDateString()}) mismatch with Expected ledger balances!
-                            <span className="ml-1 text-xs text-red-600 block">Domestic Filled Mismatch: {dbData.dailyClosings[0].mismatch14Filled} | Domestic Empty Mismatch: {dbData.dailyClosings[0].mismatch14Empty}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCloseMismatchCount(0);
+                                setShowCloseCycleModal(true);
+                              }}
+                              className="w-full md:w-auto px-4 py-2 bg-[#F37022] text-white text-xs font-semibold rounded-[4px] hover:bg-[#F37022]/90 transition active:scale-95 shadow-sm"
+                            >
+                              Close Load Cycle
+                            </button>
                           </div>
                         </div>
-                      )
-                    )}
+                      )}
 
-                    {/* Storage Capacity Guardrail */}
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-4 mb-6 shadow-sm">
-                      <div className="flex justify-between items-center text-xs font-bold text-[#02164F] mb-1.5">
-                        <span>Godown Storage Capacity Density (6,000 kg Limit)</span>
-                        <span>{dbData.kpis?.totalLpgWeight?.toLocaleString() || 0} kg stored / 6,000 kg</span>
+                      {/* SECTION 1: Current Inventory Snapshot */}
+                      <div>
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-3">Current Inventory Snapshot</h3>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-4 flex flex-col justify-between">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">14.2 kg Filled Stock</span>
+                            <div className="text-3xl font-bold text-[#001F5B] mt-1 font-mono">
+                              {dbData.inventory?.domestic?.filledStock || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-4 flex flex-col justify-between">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">14.2 kg Empty Stock</span>
+                            <div className="text-3xl font-bold text-[#001F5B] mt-1 font-mono">
+                              {dbData.inventory?.domestic?.emptyStock || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-4 flex flex-col justify-between">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">19 kg Filled Stock</span>
+                            <div className="text-3xl font-bold text-[#001F5B] mt-1 font-mono">
+                              {dbData.inventory?.commercial?.filledStock || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-4 flex flex-col justify-between">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">19 kg Empty Stock</span>
+                            <div className="text-3xl font-bold text-[#001F5B] mt-1 font-mono">
+                              {dbData.inventory?.commercial?.emptyStock || 0}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all ${
-                            dbData.kpis?.totalLpgWeight > 5500 ? 'bg-red-600' : (dbData.kpis?.totalLpgWeight > 4500 ? 'bg-yellow-500' : 'bg-[#02164F]')
-                          }`} 
-                          style={{ width: `${Math.min(100, ((dbData.kpis?.totalLpgWeight || 0) / 6000) * 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
 
-                    {/* Active Load Cycle Banner */}
-                    {dbData.activeLoadCycle && (
-                      <div className="bg-orange-50 border border-[#F37022]/20 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 bg-[#F37022]/10 rounded-lg text-[#F37022]">
-                            <Database className="w-5 h-5" />
+                      {/* SECTION 2: Today's Operations Summary */}
+                      <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5">
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 pb-2 border-b border-[#C8D2E0]">
+                          Today's Operations Summary
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 text-xs text-gray-700">
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[9px] mb-1">Deliveries Today</p>
+                            <p className="text-lg font-bold text-[#001F5B] font-mono">{dbData.kpis?.todayDeliveriesCount || 0}</p>
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-bold text-[#02164F]">Active Load Cycle: #{dbData.activeLoadCycle.loadNumber}</h4>
-                              <span className="bg-[#F37022]/10 text-[#F37022] text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize">
-                                {dbData.activeLoadCycle.loadType.toLowerCase()} Load
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              Started: {new Date(dbData.activeLoadCycle.loadDate).toLocaleString()} | Cylinders Received: {dbData.activeLoadCycle.cylindersReceived}
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[9px] mb-1">Connections Created</p>
+                            <p className="text-lg font-bold text-[#001F5B] font-mono">
+                              {dbData.connections?.filter(c => new Date(c.connectionDate) >= today)?.length || 0}
                             </p>
-                            <div className="flex gap-4 mt-2 text-xs text-gray-600 font-medium">
-                              <span>Deliveries Completed: <strong className="text-[#02164F]">{dbData.activeLoadCycle.deliveriesCompleted || 0}</strong></span>
-                              <span>Empty Returns Logged: <strong className="text-[#02164F]">{dbData.activeLoadCycle.emptyReturns || 0}</strong></span>
-                            </div>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[9px] mb-1">Incidents Reported</p>
+                            <p className="text-lg font-bold text-[#001F5B] font-mono">
+                              {dbData.incidents?.filter(i => new Date(i.incidentDate) >= today)?.length || 0}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[9px] mb-1">Cash Collected</p>
+                            <p className="text-lg font-bold text-green-700 font-mono">₹{(dbData.kpis?.todayCashCollection || 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-bold uppercase tracking-wider text-[9px] mb-1">Commercial Pending</p>
+                            <p className="text-lg font-bold text-yellow-600 font-mono">₹{(dbData.kpis?.pendingCommercialAmount || 0).toLocaleString()}</p>
                           </div>
                         </div>
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCloseMismatchCount(0);
-                              setShowCloseCycleModal(true);
-                            }}
-                            className="w-full md:w-auto px-4 py-2 bg-[#F37022] text-white text-xs font-semibold rounded-xl hover:bg-[#F37022]/90 transition active:scale-95 shadow-sm"
+                      </div>
+
+                      {/* SECTION 3: Daily Stock Movement Ledger */}
+                      <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5">
+                        <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 pb-2 border-b border-[#C8D2E0]">
+                          Daily Stock Movement Ledger
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left border-collapse text-gray-700">
+                            <thead>
+                              <tr className="border-b border-[#C8D2E0] font-bold text-[#001F5B] bg-gray-50/50">
+                                <th className="p-3">Stock Metric</th>
+                                <th className="p-3 text-center">Domestic 14.2kg</th>
+                                <th className="p-3 text-center">Commercial 19kg</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              <tr>
+                                <td className="p-3 font-semibold">Opening Filled Stock</td>
+                                <td className="p-3 text-center font-mono font-bold">{openingFilled14}</td>
+                                <td className="p-3 text-center font-mono font-bold">{openingFilled19}</td>
+                              </tr>
+                              <tr>
+                                <td className="p-3">Refills Delivered (Outflow)</td>
+                                <td className="p-3 text-center font-mono text-red-600">-{refillDelivered14}</td>
+                                <td className="p-3 text-center font-mono text-red-600">-{refillDelivered19}</td>
+                              </tr>
+                              <tr>
+                                <td className="p-3">Loads Received (Inflow)</td>
+                                <td className="p-3 text-center font-mono text-green-600">+{loadReceived14}</td>
+                                <td className="p-3 text-center font-mono text-green-600">+{loadReceived19}</td>
+                              </tr>
+                              <tr>
+                                <td className="p-3">Damaged / Leakages (Loss)</td>
+                                <td className="p-3 text-center font-mono text-orange-600">-{damaged14}</td>
+                                <td className="p-3 text-center font-mono text-orange-600">-{damaged19}</td>
+                              </tr>
+                              <tr className="bg-gray-50/30 border-t border-[#C8D2E0]">
+                                <td className="p-3 font-bold text-[#001F5B]">Closing Filled Stock</td>
+                                <td className="p-3 text-center font-mono font-bold text-lg text-[#001F5B]">{closingFilled14}</td>
+                                <td className="p-3 text-center font-mono font-bold text-lg text-[#001F5B]">{closingFilled19}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* SECTION 5: Employee Activity Queue */}
+                      <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#C8D2E0]">
+                          <h3 className="text-xs font-bold text-[#001F5B] flex items-center gap-2">
+                            <ClipboardCheck className="w-4 h-4 text-[#F37022]" />
+                            <span>Employee Activity Queue (Pending Approvals)</span>
+                          </h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F59E0B]/10 text-[#F59E0B]">
+                            {dbData.verificationQueue?.length || 0} Pending
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {dbData.verificationQueue?.map(item => (
+                            <div key={item.id} className="border border-[#C8D2E0] rounded-[4px] p-3 bg-gray-50 flex flex-col justify-between gap-2.5 text-xs">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-[8px] font-bold uppercase tracking-wider mb-1">
+                                    {item.type}
+                                  </span>
+                                  <h4 className="font-bold text-gray-800 text-[11px]">
+                                    {item.customerName || item.customer?.name || "Direct/Walk-in"}
+                                  </h4>
+                                </div>
+                                <span className="text-gray-400 font-mono text-[9px]">
+                                  {new Date(item.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+
+                              <div className="border-t border-gray-200/50 pt-1.5 grid grid-cols-2 gap-1 text-[10px] text-gray-500">
+                                {item.type === 'DELIVERY' && (
+                                  <>
+                                    <span>Qty: {item.deliveryItems?.[0]?.quantityDelivered} unit</span>
+                                    <span>Paid: ₹{item.amountReceived}</span>
+                                  </>
+                                )}
+                                {item.type === 'CONNECTION' && (
+                                  <>
+                                    <span>Type: {item.connectionType === 'SINGLE_BOTTLE' ? 'SBC' : 'DBC'}</span>
+                                    <span>Paid: ₹{item.amountPaid}</span>
+                                  </>
+                                )}
+                                {item.type === 'EMPTY_RETURN' && (
+                                  <>
+                                    <span>Qty: {item.quantity} unit</span>
+                                    <span>Type: {item.cylinderType === 'DOMESTIC_14_2' ? '14.2kg' : '19kg'}</span>
+                                  </>
+                                )}
+                                {item.type === 'PAYMENT' && (
+                                  <>
+                                    <span>Amt: ₹{item.amount}</span>
+                                    <span>Mode: {item.paymentMode}</span>
+                                  </>
+                                )}
+                                {item.type === 'INCIDENT' && (
+                                  <>
+                                    <span>Cat: {item.incidentCategory}</span>
+                                    <span>Qty: {item.quantity} unit</span>
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="border-t border-gray-200/50 pt-1.5 flex justify-end gap-1.5">
+                                <button 
+                                  onClick={() => handleRejectEntry(item)}
+                                  className="px-2 py-0.5 border border-red-200 text-red-600 rounded-[4px] text-[9px] font-bold hover:bg-red-50 transition"
+                                >
+                                  Reject
+                                </button>
+                                <button 
+                                  onClick={() => handleApproveEntry(item)}
+                                  className="px-2 py-0.5 bg-[#001F5B] text-white rounded-[4px] text-[9px] font-bold hover:bg-[#001F5B]/90 transition"
+                                >
+                                  Review
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {(!dbData.verificationQueue || dbData.verificationQueue.length === 0) && (
+                            <div className="col-span-full text-center text-gray-400 py-6 text-xs">
+                              No pending verification items in the queue.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* SECTION 4: Recent Delivery Transactions */}
+                      <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5 w-full">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#C8D2E0]">
+                          <h3 className="text-xs font-bold text-[#001F5B]">Recent Delivery Transactions</h3>
+                          <button 
+                            onClick={() => triggerPrintJob('account_ledger', {})} 
+                            className="px-2.5 py-1 bg-white border border-[#C8D2E0] text-gray-700 hover:bg-gray-50 text-[10px] rounded-[4px] font-bold transition flex items-center gap-1 cursor-pointer"
                           >
-                            Close Load Cycle
+                            <Printer className="w-3 h-3" /> Print Ledger Report
                           </button>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Cylinder Stock Registry */}
-                    <div className="mb-6 animate-fade-in">
-                      <h3 className="text-xs font-bold text-[#02164F] uppercase tracking-wider mb-3">Cylinder Stock Registry</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* 1. 14.2 filled */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">14.2 kg Filled Stock</span>
-                            <span className="px-2 py-0.5 rounded text-[8px] font-bold text-white uppercase" style={{ background: stockThresholdColor }}>
-                              {stockThreshold}
-                            </span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.inventory?.domestic?.filledStock || 0} <span className="text-xs text-gray-400 font-normal">Cyl</span>
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Filled domestic cylinders</span>
-                        </div>
-
-                        {/* 2. 14.2 empty */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">14.2 kg Empty Stock</span>
-                            <span className="text-gray-400"><TrendingUp className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.inventory?.domestic?.emptyStock || 0} <span className="text-xs text-gray-400 font-normal">Cyl</span>
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Empty domestic cylinders</span>
-                        </div>
-
-                        {/* 3. 19 filled */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">19 kg Filled Stock</span>
-                            <span className="text-blue-600 bg-blue-50 p-0.5 rounded"><TrendingUp className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.inventory?.commercial?.filledStock || 0} <span className="text-xs text-gray-400 font-normal">Cyl</span>
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Filled commercial cylinders</span>
-                        </div>
-
-                        {/* 4. 19 empty */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">19 kg Empty Stock</span>
-                            <span className="text-gray-400"><TrendingUp className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.inventory?.commercial?.emptyStock || 0} <span className="text-xs text-gray-400 font-normal">Cyl</span>
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Empty commercial cylinders</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Today's Operations Summary */}
-                    <div className="mb-6 animate-fade-in">
-                      <h3 className="text-xs font-bold text-[#02164F] uppercase tracking-wider mb-3">Today's Operations Summary</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* 5. Today's Deliveries */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Today's Deliveries</span>
-                            <span className="text-[#F37022] bg-[#F37022]/10 p-0.5 rounded"><Truck className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.kpis?.todayDeliveriesCount || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Refill dispatches today</span>
-                        </div>
-
-                        {/* 6. Cash Collected */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Cash Collected</span>
-                            <span className="text-green-600 bg-green-50 p-0.5 rounded"><DollarSign className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-green-700 mt-2">
-                            ₹{dbData.kpis?.todayCashCollection?.toLocaleString() || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Today's cash receipts</span>
-                        </div>
-
-                        {/* 7. Commercial Pending */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Commercial Pending</span>
-                            <span className="text-yellow-600 bg-yellow-50 p-0.5 rounded"><AlertTriangle className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-yellow-600 mt-2">
-                            ₹{dbData.kpis?.pendingCommercialAmount?.toLocaleString() || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Pending: {dbData.kpis?.pendingCommercialEmpties || 0} empties</span>
-                        </div>
-
-                        {/* 8. Security Alerts */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between border-l-red-500 border-l-2">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Security Alerts</span>
-                            <span className="text-red-600 bg-red-50 p-0.5 rounded"><ShieldAlert className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-red-600 mt-2">
-                            {dbData.kpis?.problemCylinders || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Damaged / leaking stock</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ancillary Services & Returns */}
-                    <div className="mb-6 animate-fade-in">
-                      <h3 className="text-xs font-bold text-[#02164F] uppercase tracking-wider mb-3">Ancillary Services & Returns</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* 9. eKYC Count Today */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">eKYC Done Today</span>
-                            <span className="text-blue-600 bg-blue-50 p-0.5 rounded"><CheckCircle className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.kpis?.eKycCountToday || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Verifications completed</span>
-                        </div>
-
-                        {/* 10. LPG Card Book Count */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">LPG Card Books Issued</span>
-                            <span className="text-orange-600 bg-orange-50 p-0.5 rounded"><FileText className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.kpis?.lpgCardBookCountToday || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Card books issued today</span>
-                        </div>
-
-                        {/* 11. Regulator Returns */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Regulator Returns</span>
-                            <span className="text-gray-600 bg-gray-50 p-0.5 rounded"><RefreshCw className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.kpis?.regulatorReturnsCount || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Total returned units</span>
-                        </div>
-
-                        {/* 12. Hose Pipe Returns */}
-                        <div className="bg-white border border-[#E8EAF0] rounded-2xl p-4 shadow-sm flex flex-col justify-between">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Hose Pipe Returns</span>
-                            <span className="text-gray-600 bg-gray-50 p-0.5 rounded"><RefreshCw className="w-3.5 h-3.5" /></span>
-                          </div>
-                          <div className="text-2xl font-bold text-[#02164F] mt-2">
-                            {dbData.kpis?.hosePipeReturnsCount || 0}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Returned units today</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stock Movement Line Chart & Employee Verification Queue */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                      {/* Chart spans 2 columns */}
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm lg:col-span-2 flex flex-col justify-between min-h-[340px]">
-                        <div className="mb-4">
-                          <h3 className="text-sm font-bold text-[#02164F]">Stock Movement (Last 7 Days)</h3>
-                          <p className="text-[11px] text-gray-400 mt-0.5">Physical inventory counts from daily EOD closings</p>
-                        </div>
-                        {chartData && chartData.length > 0 ? (
-                          <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="date" tickLine={false} axisLine={false} style={{ fontSize: 10, fill: '#94A3B8' }} />
-                                <YAxis tickLine={false} axisLine={false} style={{ fontSize: 10, fill: '#94A3B8' }} />
-                                <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: 11 }} />
-                                <Line type="monotone" dataKey="14.2 kg Filled" stroke="#02164F" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                                <Line type="monotone" dataKey="19 kg Filled" stroke="#F37022" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                                <Line type="monotone" dataKey="Empty Stock" stroke="#94A3B8" strokeWidth={2} dot={{ r: 2 }} />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
-                        ) : (
-                          <div className="h-64 flex flex-col items-center justify-center border border-dashed border-gray-100 rounded-xl bg-gray-50/50 text-center p-4">
-                            <TrendingUp className="w-8 h-8 text-gray-300 mb-2" />
-                            <p className="text-xs text-gray-500 font-medium">No stock movement data available yet</p>
-                            <p className="text-[10px] text-gray-400 mt-0.5">Please submit a Daily Closing Stock count to start tracking history.</p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Verification Queue spans 1 column */}
-                      <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm lg:col-span-1 flex flex-col justify-between min-h-[340px]">
-                        <div>
-                          <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-sm font-bold text-[#02164F] flex items-center gap-2">
-                              <ClipboardCheck className="w-4 h-4 text-[#F37022]" />
-                              <span>Employee Verification Queue</span>
-                            </h3>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F59E0B]/10 text-[#F59E0B]">
-                              {dbData.verificationQueue?.length || 0} Pending
-                            </span>
-                          </div>
-
-                          <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                            {dbData.verificationQueue?.map(item => (
-                              <div key={item.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50 hover:bg-white hover:border-[#E8EAF0] transition flex flex-col justify-between gap-2.5 text-xs">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-[8px] font-bold uppercase tracking-wider mb-1">
-                                      {item.type}
-                                    </span>
-                                    <h4 className="font-bold text-gray-800 text-[11px]">
-                                      {item.customer?.name || "Refinery / Incidents"}
-                                    </h4>
-                                  </div>
-                                  <span className="text-gray-400 font-mono text-[9px]">
-                                    {new Date(item.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-
-                                <div className="border-t border-gray-200/50 pt-1.5 grid grid-cols-2 gap-1 text-[10px] text-gray-500">
-                                  {item.type === 'DELIVERY' && (
-                                    <>
-                                      <span>Qty: {item.deliveryItems?.[0]?.quantityDelivered} unit</span>
-                                      <span>Paid: ₹{item.amountReceived}</span>
-                                    </>
-                                  )}
-                                  {item.type === 'CONNECTION' && (
-                                    <>
-                                      <span>Type: {item.connectionType === 'SINGLE_BOTTLE' ? 'SBC' : 'DBC'}</span>
-                                      <span>Paid: ₹{item.amountPaid}</span>
-                                    </>
-                                  )}
-                                  {item.type === 'EMPTY_RETURN' && (
-                                    <>
-                                      <span>Qty: {item.quantity} unit</span>
-                                      <span>Type: {item.cylinderType === 'DOMESTIC_14_2' ? '14.2kg' : '19kg'}</span>
-                                    </>
-                                  )}
-                                  {item.type === 'PAYMENT' && (
-                                    <>
-                                      <span>Amt: ₹{item.amount}</span>
-                                      <span>Mode: {item.paymentMode}</span>
-                                    </>
-                                  )}
-                                  {item.type === 'INCIDENT' && (
-                                    <>
-                                      <span>Cat: {item.incidentCategory}</span>
-                                      <span>Qty: {item.quantity} unit</span>
-                                    </>
-                                  )}
-                                </div>
-
-                                <div className="border-t border-gray-200/50 pt-1.5 flex justify-end gap-1.5">
-                                  <button 
-                                    onClick={() => handleRejectEntry(item)}
-                                    className="px-2 py-0.5 border border-red-200 text-red-600 rounded text-[9px] font-bold hover:bg-red-50 transition"
-                                  >
-                                    Reject
-                                  </button>
-                                  <button 
-                                    onClick={() => handleApproveEntry(item)}
-                                    className="px-2 py-0.5 bg-[#02164F] text-white rounded text-[9px] font-bold hover:bg-[#02164F]/90 transition"
-                                  >
-                                    Review
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-
-                            {(!dbData.verificationQueue || dbData.verificationQueue.length === 0) && (
-                              <div className="text-center text-gray-400 py-12 text-xs">
-                                No pending verification items in the queue.
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Recent table (Full Width) */}
-                    <div className="bg-white border border-[#E8EAF0] rounded-xl p-5 shadow-sm mb-6 w-full">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-bold text-[#02164F]">Recent Delivery Transactions</h3>
-                        <button 
-                          onClick={() => triggerPrintJob('account_ledger', {})} 
-                          className="px-2.5 py-1 bg-white border border-[#E8EAF0] text-gray-700 hover:bg-gray-50 text-[10px] rounded font-bold transition flex items-center gap-1"
-                        >
-                          <Printer className="w-3 h-3" /> Print Ledger Report
-                        </button>
-                      </div>
-                      
-                      <div className="overflow-x-auto w-full">
-                        <table className="w-full text-xs text-left border-collapse min-w-[700px]">
-                          <thead>
-                            <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
-                              <th className="p-3">Date</th>
-                              <th className="p-3">Customer</th>
-                              <th className="p-3">Staff</th>
-                              <th className="p-3">Cylinder Details</th>
-                              <th className="p-3">DAC Code</th>
-                              <th className="p-3">Total Amount</th>
-                              <th className="p-3">Status</th>
-                              <th className="p-3 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {filteredDeliveries.map(del => {
-                              const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
-                              const emp = dbData.employees?.find(e => e.id === del.employeeId) || { name: 'N/A' };
-                              const item = del.deliveryItems?.[0] || { quantityDelivered: 0, cylinderType: 'DOMESTIC_14_2', dacCode: '', ratePerCylinder: 0 };
-                              const statusColor = del.verificationStatus === 'APPROVED' 
-                                ? 'bg-green-100 text-green-700' 
-                                : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
-                              return (
-                                <tr key={del.id} className="hover:bg-gray-50/50">
-                                  <td className="p-3 font-medium">{new Date(del.deliveryDate).toLocaleDateString()}</td>
-                                  <td className="p-3 font-semibold text-gray-800">{del.customerName || cust.name}</td>
-                                  <td className="p-3">{emp.name}</td>
-                                  <td className="p-3">{item.quantityDelivered} unit ({item.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'})</td>
-                                  <td className="p-3 font-mono font-bold text-gray-700">{item.dacCode || 'N/A'}</td>
-                                  <td className="p-3 font-semibold">₹{del.totalAmount}</td>
-                                  <td className="p-3">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${statusColor}`}>
-                                      {del.verificationStatus}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 text-right">
-                                    <button 
-                                      onClick={() => triggerPrintJob('invoice', {
-                                        invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
-                                        invoiceDate: del.deliveryDate,
-                                        customerName: cust.name,
-                                        quantity: item.quantityDelivered,
-                                        rate: item.ratePerCylinder,
-                                        totalAmount: del.totalAmount,
-                                        paidAmount: del.amountReceived,
-                                        balanceAmount: del.amountPending,
-                                        paymentStatus: del.paymentStatus
-                                      })}
-                                      className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
-                                      title="Print Receipt"
-                                    >
-                                      <Printer className="w-4 h-4 inline" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            {filteredDeliveries.length === 0 && (
-                              <tr>
-                                <td colSpan="8" className="text-center text-gray-400 py-8">No delivery records found.</td>
+                        
+                        <div className="overflow-x-auto w-full">
+                          <table className="w-full text-xs text-left border-collapse min-w-[700px] text-gray-700">
+                            <thead>
+                              <tr className="border-b border-[#C8D2E0] text-gray-500 font-bold bg-gray-50/50">
+                                <th className="p-3">Date</th>
+                                <th className="p-3">Customer</th>
+                                <th className="p-3">Staff</th>
+                                <th className="p-3">Cylinder Details</th>
+                                <th className="p-3">DAC Code</th>
+                                <th className="p-3">Total Amount</th>
+                                <th className="p-3">Status</th>
+                                <th className="p-3 text-right">Actions</th>
                               </tr>
-                            )}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {filteredDeliveries.map(del => {
+                                const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
+                                const emp = dbData.employees?.find(e => e.id === del.employeeId) || { name: 'N/A' };
+                                const item = del.deliveryItems?.[0] || { quantityDelivered: 0, cylinderType: 'DOMESTIC_14_2', dacCode: '', ratePerCylinder: 0 };
+                                const statusColor = del.verificationStatus === 'APPROVED' 
+                                  ? 'bg-green-100 text-green-700 border-green-200' 
+                                  : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-red-100 text-red-700 border-red-200');
+                                return (
+                                  <tr key={del.id} className="hover:bg-gray-50/50">
+                                    <td className="p-3 font-medium">{new Date(del.deliveryDate).toLocaleDateString()}</td>
+                                    <td className="p-3 font-semibold text-gray-800">{del.customerName || cust.name}</td>
+                                    <td className="p-3">{emp.name}</td>
+                                    <td className="p-3">{item.quantityDelivered} unit ({item.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'})</td>
+                                    <td className="p-3 font-mono font-bold text-gray-700">{item.dacCode || 'N/A'}</td>
+                                    <td className="p-3 font-semibold">₹{del.totalAmount}</td>
+                                    <td className="p-3">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded-[2px] border text-[8px] font-bold uppercase ${statusColor}`}>
+                                        {del.verificationStatus}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <button 
+                                        onClick={() => triggerPrintJob('invoice', {
+                                          invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
+                                          invoiceDate: del.deliveryDate,
+                                          customerName: cust.name,
+                                          quantity: item.quantityDelivered,
+                                          rate: item.ratePerCylinder,
+                                          totalAmount: del.totalAmount,
+                                          paidAmount: del.amountReceived,
+                                          balanceAmount: del.amountPending,
+                                          paymentStatus: del.paymentStatus
+                                        })}
+                                        className="p-1 text-[#001F5B] hover:bg-gray-100 rounded-[4px] transition"
+                                        title="Print Receipt"
+                                      >
+                                        <Printer className="w-4 h-4 inline" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {filteredDeliveries.length === 0 && (
+                                <tr>
+                                  <td colSpan="8" className="text-center text-gray-400 py-8">No delivery records found.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ========================================================================= */}
                 {/* EMPLOYEE DASHBOARD VIEW */}
                 {/* ========================================================================= */}
                 {isEmployee && (
                   <div className="space-y-6 animate-fade-in employee-shell">
-                    {/* Today's Summary Grid */}
-                    <div>
-                      <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-3">Today's Summary</h3>
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="employee-card flex flex-col justify-between">
-                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Refills Delivered</span>
-                          <div className="text-2xl font-bold text-[#001F5B] mt-2">
-                            {refillTodayCount}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Refills completed today</span>
+                    <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5 max-w-md shadow-none">
+                      <h3 className="text-xs font-bold text-[#001F5B] uppercase tracking-wider mb-4 pb-2 border-b border-[#C8D2E0]">
+                        Today's Assigned Work
+                      </h3>
+                      <div className="space-y-3 text-xs text-gray-700 font-medium font-mono">
+                        <div className="flex justify-between items-center">
+                          <span>Refill Entries Today :</span>
+                          <span className="font-bold text-[#001F5B]">{refillTodayCount}</span>
                         </div>
-
-                        <div className="employee-card flex flex-col justify-between">
-                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">New Connections</span>
-                          <div className="text-2xl font-bold text-[#001F5B] mt-2">
-                            {connectionsTodayCount}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Contracts verified today</span>
+                        <div className="flex justify-between items-center">
+                          <span>Pending Verification :</span>
+                          <span className="font-bold text-[#001F5B]">{connectionsTodayCount}</span>
                         </div>
-
-                        <div className="employee-card flex flex-col justify-between">
-                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Incidents Logged</span>
-                          <div className="text-2xl font-bold text-red-600 mt-2">
-                            {incidentsTodayCount}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Defects/leakages reported</span>
-                        </div>
-
-                        <div className="employee-card flex flex-col justify-between">
-                          <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Today's Collections</span>
-                          <div className="text-2xl font-bold text-green-700 mt-2">
-                            ₹{totalCollectionToday.toLocaleString()}
-                          </div>
-                          <span className="text-[10px] text-gray-400 mt-1">Total cash receipts today</span>
+                        <div className="flex justify-between items-center">
+                          <span>Incidents Submitted :</span>
+                          <span className="font-bold text-red-600">{incidentsTodayCount}</span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Action Cards */}
-                    <div className="employee-card">
-                      <h3 className="text-sm font-bold text-[#001F5B] mb-4">LPG Operations Quick Actions</h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="border-t border-[#C8D2E0] my-4 pt-4 flex flex-col gap-2">
                         <button 
                           onClick={() => {
                             if (!dbData.isInitialized) {
@@ -4383,19 +4320,10 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
                             setActiveTab('refill');
                           }}
                           disabled={!dbData.isInitialized}
-                          className={`flex flex-col items-center gap-2 p-4 rounded border text-center transition ${
-                            !dbData.isInitialized 
-                              ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
-                              : 'bg-white text-gray-800 border-gray-100 hover:border-[#F37022] hover:bg-gray-50'
-                          }`}
+                          className="w-full h-10 border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <Receipt className={`w-6 h-6 ${!dbData.isInitialized ? 'text-gray-400' : 'text-[#F37022]'}`} />
-                          <span className="text-xs font-bold font-sans">Cylinder Refill Entry</span>
-                          {!dbData.isInitialized && (
-                            <span className="text-[9px] text-red-500 font-semibold mt-1">Locked (Init Required)</span>
-                          )}
+                          Create Refill Entry
                         </button>
-
                         <button 
                           onClick={() => {
                             if (!dbData.isInitialized) {
@@ -4405,103 +4333,22 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
                             setActiveTab('connection');
                           }}
                           disabled={!dbData.isInitialized}
-                          className={`flex flex-col items-center gap-2 p-4 rounded border text-center transition ${
-                            !dbData.isInitialized 
-                              ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60' 
-                              : 'bg-white text-gray-800 border-gray-100 hover:border-blue-600 hover:bg-gray-50'
-                          }`}
+                          className="w-full h-10 border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <UserPlus className={`w-6 h-6 ${!dbData.isInitialized ? 'text-gray-400' : 'text-blue-600'}`} />
-                          <span className="text-xs font-bold font-sans">New Connection (SBC/DBC)</span>
-                          {!dbData.isInitialized && (
-                            <span className="text-[9px] text-red-500 font-semibold mt-1">Locked (Init Required)</span>
-                          )}
+                          New SBC/DBC Connection
                         </button>
-
                         <button 
                           onClick={() => setActiveTab('incident')}
-                          className="flex flex-col items-center gap-2 p-4 rounded border bg-white border-gray-100 hover:border-red-600 hover:bg-gray-50 transition text-center cursor-pointer"
+                          className="w-full h-10 border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer flex items-center justify-center gap-2"
                         >
-                          <AlertOctagon className="w-6 h-6 text-red-600" />
-                          <span className="text-xs font-bold font-sans">Incident / Complaint</span>
-                          <span className="text-[9px] text-green-600 font-semibold mt-1">Always Active</span>
+                          Incident Entry
                         </button>
-
                         <button 
                           onClick={() => setActiveTab('my_entries')}
-                          className="flex flex-col items-center gap-2 p-4 rounded border bg-white border-gray-100 hover:border-green-600 hover:bg-gray-50 transition text-center cursor-pointer"
+                          className="w-full h-10 border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer flex items-center justify-center gap-2"
                         >
-                          <FileText className="w-6 h-6 text-green-600" />
-                          <span className="text-xs font-bold font-sans">My Entries History</span>
-                          <span className="text-[9px] text-green-600 font-semibold mt-1">Always Active</span>
+                          My Entries
                         </button>
-                      </div>
-                    </div>
-
-                    {/* My Recent Submissions Table */}
-                    <div className="employee-card">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-sm font-bold text-[#001F5B]">My Recent Submissions</h3>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs text-left border-collapse">
-                          <thead>
-                            <tr className="border-b border-[#E8EAF0] text-gray-500 font-bold bg-gray-50/50">
-                              <th className="p-3">Date</th>
-                              <th className="p-3">Customer</th>
-                              <th className="p-3">Details</th>
-                              <th className="p-3">Total Amount</th>
-                              <th className="p-3">Status</th>
-                              <th className="p-3 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {filteredDeliveries.slice(0, 8).map(del => {
-                              const cust = dbData.customers?.find(c => c.id === del.customerId) || { name: 'Direct/Walk-in' };
-                              const statusColor = del.verificationStatus === 'APPROVED' 
-                                ? 'bg-green-100 text-green-700' 
-                                : (del.verificationStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700');
-                              const item = del.deliveryItems?.[0] || {};
-                              return (
-                                <tr key={del.id} className="hover:bg-gray-50/50">
-                                  <td className="p-3 font-medium">{new Date(del.deliveryDate).toLocaleDateString()}</td>
-                                  <td className="p-3 font-semibold text-gray-800">{del.customerName || cust.name}</td>
-                                  <td className="p-3">{item.quantityDelivered || 0} unit ({item.cylinderType === 'DOMESTIC_14_2' ? '14.2 kg' : '19 kg'})</td>
-                                  <td className="p-3 font-semibold">₹{del.totalAmount}</td>
-                                  <td className="p-3">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${statusColor}`}>
-                                      {del.verificationStatus}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 text-right">
-                                    <button 
-                                      onClick={() => triggerPrintJob('invoice', {
-                                        invoiceNumber: `INV-${del.id.slice(-6).toUpperCase()}`,
-                                        invoiceDate: del.deliveryDate,
-                                        customerName: del.customerName || cust.name,
-                                        quantity: item.quantityDelivered,
-                                        rate: item.ratePerCylinder,
-                                        totalAmount: del.totalAmount,
-                                        paidAmount: del.amountReceived,
-                                        balanceAmount: del.amountPending,
-                                        paymentStatus: del.paymentStatus
-                                      })}
-                                      className="p-1 text-[#02164F] hover:bg-gray-100 rounded transition"
-                                      title="Print Slip"
-                                    >
-                                      <Printer className="w-4 h-4 inline" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                            {filteredDeliveries.length === 0 && (
-                              <tr>
-                                <td colSpan="6" className="text-center text-gray-400 py-8">No submissions recorded yet.</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
                       </div>
                     </div>
                   </div>
@@ -4707,70 +4554,41 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
 
                       {/* Right side panel */}
                       <div className="space-y-6">
-                        {/* Reports Center Panel */}
-                        <div className="auditor-card">
-                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider">Reports Center</h3>
-                          <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                            Quickly access statements and details ledger books.
-                          </p>
-                          <div className="space-y-2">
-                            <button 
-                              onClick={() => { setActiveTab('reports'); setSelectedReportType('closings'); }}
-                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
-                            >
-                              <span>EOD Closings Log</span>
-                              <ChevronRight size={14} className="text-gray-400" />
-                            </button>
-                            <button 
-                              onClick={() => { setActiveTab('commercial'); }}
-                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
-                            >
-                              <span>Accounts Debts Ledger</span>
-                              <ChevronRight size={14} className="text-gray-400" />
-                            </button>
-                            <button 
-                              onClick={() => { setActiveTab('reports'); setSelectedReportType('expenses'); }}
-                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-left rounded-lg text-xs font-semibold text-gray-700 flex justify-between items-center transition cursor-pointer"
-                            >
-                              <span>Expenses Log</span>
-                              <ChevronRight size={14} className="text-gray-400" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Uploads Panel */}
-                        <div className="auditor-card">
-                          <h3 className="text-sm font-bold text-[#001F5B] mb-3 uppercase tracking-wider flex items-center justify-between">
-                            <span>Verification Uploads</span>
-                            <span className="text-[10px] bg-[#001F5B]/10 text-[#001F5B] px-2 py-0.5 rounded-full font-bold">
-                              {dbData.auditorVerifications?.length || 0} Total
-                            </span>
+                        {/* AUDIT ACTIONS */}
+                        <div className="bg-white border border-[#C8D2E0] rounded-[4px] p-5 shadow-none">
+                          <h3 className="text-xs font-bold text-[#001F5B] mb-4 pb-2 border-b border-[#C8D2E0] uppercase tracking-wider">
+                            Audit Actions
                           </h3>
-                          <p className="text-xs text-gray-500 mb-4 leading-relaxed font-semibold">
-                            Verification logs and stock image attachments.
-                          </p>
-
-                          <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-                            {dbData.auditorVerifications?.slice(0, 3).map(log => (
-                              <div key={log.id} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50 text-[11px]">
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="font-semibold text-gray-800">{new Date(log.verificationDate).toLocaleDateString()}</span>
-                                  <span className="text-gray-400 font-mono text-[9px]">By {log.uploadedBy}</span>
-                                </div>
-                                <p className="text-gray-600 line-clamp-2 leading-tight">{log.notes || 'No description notes added.'}</p>
-                              </div>
-                            ))}
-                            {(!dbData.auditorVerifications || dbData.auditorVerifications.length === 0) && (
-                              <p className="text-center text-gray-400 py-6 text-xs">No verification proofs uploaded yet.</p>
-                            )}
+                          <div className="flex flex-col gap-2">
+                            <button 
+                              onClick={() => setActiveTab('closing')}
+                              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+                            >
+                              <span>Daily Closing Verification</span>
+                              <span>&rarr;</span>
+                            </button>
+                            <button 
+                              onClick={() => setActiveTab('commercial')}
+                              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+                            >
+                              <span>Account Ledger</span>
+                              <span>&rarr;</span>
+                            </button>
+                            <button 
+                              onClick={() => setActiveTab('reports')}
+                              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+                            >
+                              <span>Reports Download</span>
+                              <span>&rarr;</span>
+                            </button>
+                            <button 
+                              onClick={() => setActiveTab('auditor_uploads')}
+                              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+                            >
+                              <span>Upload Verification</span>
+                              <span>&rarr;</span>
+                            </button>
                           </div>
-                          
-                          <button 
-                            onClick={() => setActiveTab('auditor_uploads')}
-                            className="w-full mt-4 py-2.5 bg-[#001F5B] hover:bg-[#001F5B]/90 text-white rounded text-xs font-bold transition text-center uppercase tracking-wider cursor-pointer"
-                          >
-                            Upload Verification Image
-                          </button>
                         </div>
                       </div>
                     </div>
