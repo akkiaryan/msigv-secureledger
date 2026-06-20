@@ -325,11 +325,45 @@ export default function DashboardClient({ initialData, user }) {
   // Set default tab
   useEffect(() => {
     if (isEmployee) {
-      setActiveTab('dashboard'); // Employee dashboard is quick action cards + entries
+      setActiveTab('dashboard');
     } else if (isAuditor) {
       setActiveTab('dashboard');
     }
   }, [user.role]);
+
+  // Lock body scroll when any modal or drawer is open
+  useEffect(() => {
+    const isAnyModalOpen = !!(
+      showMoreMenu ||
+      verifyingItem ||
+      rejectingItem ||
+      showCommercialCustomerModal ||
+      showStartCycleModal ||
+      showCloseCycleModal ||
+      showArchiveConfirm ||
+      showConfirm
+    );
+    if (isAnyModalOpen) {
+      document.body.classList.add('overflow-hidden');
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.classList.remove('overflow-hidden');
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+      document.body.style.overflow = '';
+    };
+  }, [
+    showMoreMenu,
+    verifyingItem,
+    rejectingItem,
+    showCommercialCustomerModal,
+    showStartCycleModal,
+    showCloseCycleModal,
+    showArchiveConfirm,
+    showConfirm
+  ]);
 
   // Load Data Helper
   const loadData = async () => {
@@ -6277,6 +6311,7 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
                 } else if (!isDisabled) {
                   setActiveTab(link.tab);
                   setActiveForm(null);
+                  setShowMoreMenu(false);
                 }
               }}
               className={`mobile-nav-item ${isActive || (link.tab === 'more' && showMoreMenu) ? 'active' : ''} ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -6288,69 +6323,180 @@ Mismatch Reason: ${auditorClosingForm.mismatchReason || 'None provided'}`;
         })}
       </nav>
 
-      {/* Mobile More Menu Overlay */}
-      {showMoreMenu && (
-        <div className="fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm z-[999] flex items-end justify-center" onClick={() => setShowMoreMenu(false)}>
-          <div className="bg-white w-full rounded-t-2xl border-t border-[#C8D2E0] p-6 space-y-4 max-w-md font-sans" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center border-b border-[#C8D2E0] pb-3">
-              <h3 className="text-sm font-bold text-[#001F5B] uppercase tracking-wider">More Operations</h3>
-              <button onClick={() => setShowMoreMenu(false)} className="text-gray-400 hover:text-gray-600 font-bold text-sm">Close</button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 py-2">
-              {/* Render the remaining 5th menu items based on role */}
-              {isEmployee && (
-                <button
-                  onClick={() => {
-                    setActiveTab('my_entries');
-                    setActiveForm(null);
-                    setShowMoreMenu(false);
-                  }}
-                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
-                >
-                  <FileText className="w-6 h-6 text-[#001F5B]" />
-                  <span>My Entries</span>
-                </button>
-              )}
-              {isAuditor && (
-                <button
-                  onClick={() => {
-                    setActiveTab('auditor_uploads');
-                    setActiveForm(null);
-                    setShowMoreMenu(false);
-                  }}
-                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
-                >
-                  <Database className="w-6 h-6 text-[#001F5B]" />
-                  <span>Auditor Uploads</span>
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setActiveTab('closing');
-                    setActiveForm(null);
-                    setShowMoreMenu(false);
-                  }}
-                  className="flex flex-col items-center justify-center p-3 border border-[#C8D2E0] rounded-[4px] hover:bg-gray-50 text-xs font-semibold text-gray-700 gap-2"
-                >
-                  <Lock className="w-6 h-6 text-[#001F5B]" />
-                  <span>Daily Closing</span>
-                </button>
-              )}
-
-              {/* General Direct /logout trigger */}
-              <button
-                onClick={() => signOut({ callbackUrl: '/sign-in' })}
-                className="flex flex-col items-center justify-center p-3 border border-red-200 bg-red-50 hover:bg-red-100 rounded-[4px] text-xs font-bold text-red-600 gap-2"
-              >
-                <LogOut className="w-6 h-6 text-red-600" />
-                <span>Logout Session</span>
-              </button>
-            </div>
-          </div>
+      {/* Mobile More Menu Overlay & Drawer */}
+      <div 
+        className={`fixed inset-0 bg-[#02164F]/35 backdrop-blur-sm z-[9998] transition-opacity duration-300 ${
+          showMoreMenu ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`} 
+        onClick={() => setShowMoreMenu(false)}
+      />
+      <div 
+        className={`fixed left-0 right-0 bg-white border-t border-[#C8D2E0] p-6 space-y-4 max-w-md mx-auto z-[9999] transition-transform duration-300 ease-out rounded-t-xl ${
+          showMoreMenu ? 'translate-y-0' : 'translate-y-full'
+        }`}
+        style={{
+          bottom: 'calc(64px + env(safe-area-inset-bottom))',
+          maxHeight: '75dvh',
+          overflowY: 'auto',
+          paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b border-[#C8D2E0] pb-3">
+          <h3 className="text-sm font-bold text-[#001F5B] uppercase tracking-wider">More Operations</h3>
+          <button onClick={() => setShowMoreMenu(false)} className="text-gray-400 hover:text-gray-600 font-bold text-sm">Close</button>
         </div>
-      )}
+
+        <div className="flex flex-col gap-2 py-2">
+          {/* Daily Closing for Admin / Auditor */}
+          {(isAdmin || isAuditor) && (
+            <button
+              onClick={() => {
+                setActiveTab('closing');
+                setActiveForm(null);
+                setShowMoreMenu(false);
+              }}
+              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-[#001F5B]" />
+                <span>Daily Closing</span>
+              </span>
+              <span>&rarr;</span>
+            </button>
+          )}
+
+          {/* Reports for Admin / Auditor */}
+          {(isAdmin || isAuditor) && (
+            <button
+              onClick={() => {
+                setActiveTab('reports');
+                setActiveForm(null);
+                setShowMoreMenu(false);
+              }}
+              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#001F5B]" />
+                <span>Reports & Downloads</span>
+              </span>
+              <span>&rarr;</span>
+            </button>
+          )}
+
+          {/* Employee specific options */}
+          {isEmployee && (
+            <>
+              <button
+                onClick={() => {
+                  setActiveTab('my_entries');
+                  setActiveForm(null);
+                  setShowMoreMenu(false);
+                }}
+                className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#001F5B]" />
+                  <span>My Entries</span>
+                </span>
+                <span>&rarr;</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('incident');
+                  setActiveForm(null);
+                  setShowMoreMenu(false);
+                }}
+                className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <AlertOctagon className="w-4 h-4 text-[#001F5B]" />
+                  <span>Incident Logs</span>
+                </span>
+                <span>&rarr;</span>
+              </button>
+            </>
+          )}
+
+          {/* Auditor Uploads */}
+          {isAuditor && (
+            <button
+              onClick={() => {
+                setActiveTab('auditor_uploads');
+                setActiveForm(null);
+                setShowMoreMenu(false);
+              }}
+              className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#001F5B]" />
+                <span>Upload Verification</span>
+              </span>
+              <span>&rarr;</span>
+            </button>
+          )}
+
+          {/* Admin specific options */}
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => {
+                  setActiveTab('staff');
+                  setActiveForm(null);
+                  setShowMoreMenu(false);
+                }}
+                className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-[#001F5B]" />
+                  <span>Staff Management</span>
+                </span>
+                <span>&rarr;</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('archive');
+                  setActiveForm(null);
+                  setShowMoreMenu(false);
+                }}
+                className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-[#001F5B]" />
+                  <span>Data Archive</span>
+                </span>
+                <span>&rarr;</span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('settings');
+                  setActiveForm(null);
+                  setShowMoreMenu(false);
+                }}
+                className="w-full h-10 px-4 flex items-center justify-between border border-[#C8D2E0] bg-white text-[#001F5B] hover:bg-gray-50 text-xs font-bold rounded-[4px] transition cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-[#001F5B]" />
+                  <span>Portal Parameters</span>
+                </span>
+                <span>&rarr;</span>
+              </button>
+            </>
+          )}
+
+          {/* Logout Session */}
+          <button
+            onClick={() => signOut({ callbackUrl: '/sign-in' })}
+            className="w-full h-10 px-4 flex items-center justify-between border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-[4px] transition cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <LogOut className="w-4 h-4 text-red-600" />
+              <span>Logout Session</span>
+            </span>
+            <span>&rarr;</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

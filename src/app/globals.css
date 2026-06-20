@@ -39,7 +39,7 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   font-family: 'Poppins', 'Inter', -apple-system, sans-serif;
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   line-height: 1.5;
 }
@@ -49,7 +49,7 @@ body {
    ---------------------------------------------------- */
 .app-container {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Pure White Left Sidebar */
@@ -61,7 +61,7 @@ body {
   display: flex;
   flex-direction: column;
   position: fixed;
-  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
   left: 0;
   top: 72px;
   z-index: 100;
@@ -794,7 +794,7 @@ body {
 .app-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100dvh - 72px);
 }
 
 .app-sidebar {
@@ -824,11 +824,13 @@ body {
   bottom: 0;
   left: 0;
   width: 100%;
+  height: 64px;
   background: var(--bg-white);
   border-top: 1px solid var(--border-clean);
-  z-index: 1000;
+  z-index: 10000;
   grid-template-columns: repeat(5, 1fr);
   padding: 0.5rem 0;
+  padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
 }
 
@@ -853,7 +855,7 @@ body {
 .msigv-app {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
-  min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   background: #F5F7FA;
 }
@@ -864,7 +866,7 @@ body {
   min-width: 260px;
   background: #FFFFFF;
   border-right: 1px solid #C8D2E0;
-  min-height: 100vh;
+  min-height: 100dvh;
   position: sticky;
   top: 0;
   overflow-y: auto;
@@ -1115,6 +1117,7 @@ body {
 
   .msigv-content {
     padding: 16px;
+    padding-bottom: 96px;
     max-width: 100%;
   }
 
